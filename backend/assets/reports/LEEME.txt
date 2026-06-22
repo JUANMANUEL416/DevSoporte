@@ -1,0 +1,20 @@
+Logo del reporte "Registro de Asistencia" (capacitaciones)
+==========================================================
+
+Copie el archivo del sistema Clarion original:
+
+  Origen:  c:\DEV11.1\Agenda\imagenes\Logoixcalidad.jpg
+
+  Destino (elija uno):
+    c:\DEVPOSGRES\DevSoporte\backend\assets\reports\logo-ixcalidad.jpg
+    c:\DEVPOSGRES\DevSoporte\backend\assets\reports\Logoixcalidad.jpg
+
+También se busca automáticamente en la ruta Clarion si existe.
+
+Opcional en backend\.env:
+  CAPACITACION_LOGO_PATH=C:\ruta\completa\Logoixcalidad.jpg
+
+El reporte replica el diseño Clarion Rpt:RegistroAsistencia (agen2045.clw):
+  - Colores: relleno naranja #FFCC66, bordes negros
+  - Coordenadas y secciones iguales al fuente
+  - 16 filas de asistentes (vacías si faltan datos)

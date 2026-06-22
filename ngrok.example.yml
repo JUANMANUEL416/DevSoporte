@@ -1,0 +1,7 @@
+# Copie a ngrok.yml (o use: ngrok http 9020)
+# Documentacion: https://ngrok.com/docs
+version: '2'
+tunnels:
+  devsoporte-web:
+    addr: 9020
+    proto: http

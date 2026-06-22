@@ -1,0 +1,1 @@
+ALTER TABLE rasist ADD COLUMN IF NOT EXISTS registro_token TEXT;

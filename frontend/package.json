@@ -1,0 +1,28 @@
+{
+  "name": "devsoporte-frontend",
+  "version": "1.0.0",
+  "description": "Frontend Quasar (Vue 3) para DevSoporte - migración del sistema Clarion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "quasar dev",
+    "build": "quasar build",
+    "lint": "echo \"(configure eslint si lo requiere)\""
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.16.0",
+    "axios": "^1.7.0",
+    "pdfjs-dist": "^4.9.155",
+    "pinia": "^2.1.0",
+    "quasar": "^2.16.0",
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@quasar/app-vite": "2.2.0",
+    "autoprefixer": "^10.4.0"
+  },
+  "engines": {
+    "node": ">= 18"
+  }
+}
