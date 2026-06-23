@@ -39,6 +39,13 @@ export function crudRouter(entity) {
 
   const splitId = (id) => String(id).split('~');
 
+  function sanitizeRow(row) {
+    if (!row || !entity.responseOmit?.length) return row;
+    const out = { ...row };
+    for (const key of entity.responseOmit) delete out[key];
+    return out;
+  }
+
   const buildWhere = (req) => {
     const params = [];
     const clauses = [];
@@ -133,7 +140,7 @@ export function crudRouter(entity) {
       const ids = splitId(req.params.id);
       const result = await query(`SELECT * FROM ${table} WHERE ${pkWhere()}`, ids);
       if (!result.rows.length) return res.status(404).json({ error: 'No encontrado' });
-      res.json(result.rows[0]);
+      res.json(sanitizeRow(result.rows[0]));
     } catch (err) {
       next(err);
     }
@@ -177,7 +184,8 @@ export function crudRouter(entity) {
           console.error(`[${table}] afterCreate:`, err.message);
         }
       }
-      res.status(201).json(_meta ? { ...row, _meta } : row);
+      const safeRow = sanitizeRow(row);
+      res.status(201).json(_meta ? { ...safeRow, _meta } : safeRow);
     } catch (err) {
       if (err.status) return res.status(err.status).json({ error: err.message });
       next(err);
@@ -200,7 +208,7 @@ export function crudRouter(entity) {
         [...values, ...ids],
       );
       if (!result.rows.length) return res.status(404).json({ error: 'No encontrado' });
-      res.json(result.rows[0]);
+      res.json(sanitizeRow(result.rows[0]));
     } catch (err) {
       if (err.status) return res.status(err.status).json({ error: err.message });
       next(err);

@@ -61,6 +61,8 @@
                 outlined
                 dense
                 clearable
+                emit-value
+                map-options
                 class="generic-form__field"
                 bg-color="white"
                 :disable="isFieldDisabled(f)"
@@ -105,6 +107,31 @@
                 :rules="dateRules(f)"
               />
               <q-input
+                v-else-if="f.type === 'password'"
+                v-model="form[f.name]"
+                :label="passwordLabel(f)"
+                type="password"
+                autocomplete="new-password"
+                outlined
+                dense
+                class="generic-form__field"
+                bg-color="white"
+                :hint="passwordHint(f)"
+              />
+              <div v-else-if="f.type === 'signature'" class="generic-form__signature">
+                <div class="generic-form__signature-label">{{ f.label }}</div>
+                <SignaturePad
+                  v-if="open"
+                  :key="signaturePadKey"
+                  :titulo="form[f.name] ? 'Actualizar firma' : 'Registrar firma'"
+                  :existing-image="form[f.name] || ''"
+                  :show-cancel="false"
+                  allow-upload
+                  height="200px"
+                  @save="(url) => onSignatureSave(f.name, url)"
+                />
+              </div>
+              <q-input
                 v-else
                 v-model="form[f.name]"
                 :label="f.label"
@@ -113,6 +140,7 @@
                 class="generic-form__field"
                 bg-color="white"
                 :disable="isFieldDisabled(f)"
+                :hint="f.hint || undefined"
                 :rules="f.required ? [(v) => !!v || 'Requerido'] : []"
               />
             </div>
@@ -143,6 +171,7 @@ import { useQuasar } from 'quasar';
 import { useResource } from 'src/services/api';
 import LookupSelect from 'components/LookupSelect.vue';
 import ContactosDialogField from 'components/ContactosDialogField.vue';
+import SignaturePad from 'components/SignaturePad.vue';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -157,6 +186,7 @@ const $q = useQuasar();
 const formRef = ref(null);
 const form = ref({});
 const saving = ref(false);
+const signaturePadKey = ref(0);
 
 const open = computed({
   get: () => props.modelValue,
@@ -165,7 +195,9 @@ const open = computed({
 
 const cardStyle = computed(() => {
   const cols = props.module.formCols || 1;
+  if (cols >= 4) return { minWidth: '920px', maxWidth: '96vw' };
   if (cols >= 3) return { minWidth: '720px', maxWidth: '95vw' };
+  if (cols === 2) return { minWidth: '560px', maxWidth: '92vw' };
   return { minWidth: '480px', maxWidth: '90vw' };
 });
 
@@ -257,19 +289,32 @@ function dateRules(f) {
   return rules;
 }
 
+function passwordLabel(f) {
+  if (props.isEdit && f.editHint) return f.label;
+  return f.required ? `${f.label} *` : f.label;
+}
+
+function passwordHint(f) {
+  if (props.isEdit && f.editHint) return f.editHint;
+  return f.hint || undefined;
+}
+
+function onSignatureSave(field, dataUrl) {
+  form.value[field] = dataUrl;
+  $q.notify({ type: 'positive', message: 'Firma lista para guardar' });
+}
+
 function fieldColClass(f) {
-  if (f.type === 'textarea') return 'col-12';
-  if (f.type === 'contactosDialog') return 'col-12 col-md-6';
+  if (f.type === 'textarea' || f.type === 'signature' || f.type === 'contactosDialog') {
+    return f.type === 'contactosDialog' ? 'col-12 col-md-6' : 'col-12';
+  }
   const cols = props.module.formCols || 1;
-  const span = f.colSpan || 1;
-  if (cols === 4) {
-    const md = Math.min(12, 3 * span);
-    return `col-12 col-sm-6 col-md-${md}`;
-  }
-  if (cols === 3) {
-    const md = Math.min(12, 4 * span);
-    return `col-12 col-sm-6 col-md-${md}`;
-  }
+  const span = Math.max(1, f.colSpan || 1);
+  const unit = 12 / cols;
+  const md = Math.min(12, unit * span);
+  if (cols >= 4) return `col-12 col-sm-6 col-lg-${md}`;
+  if (cols === 3) return `col-12 col-sm-6 col-md-${md}`;
+  if (cols === 2) return `col-12 col-sm-6 col-md-${md}`;
   return 'col-12';
 }
 
@@ -296,6 +341,8 @@ watch(
           } else {
             base[f.name] = '';
           }
+        } else if (f.type === 'password') {
+          base[f.name] = '';
         } else if (f.type === 'select' && !props.isEdit && f.default && props.record[f.name] === undefined) {
           base[f.name] = f.default;
         } else {
@@ -303,6 +350,7 @@ watch(
         }
       }
       form.value = base;
+      signaturePadKey.value += 1;
     }
   },
 );
@@ -328,6 +376,11 @@ async function save() {
   try {
     const api = useResource(props.module.resource);
     const payload = { ...form.value };
+    for (const f of props.module.fields) {
+      if (f.type === 'password' && !String(payload[f.name] || '').trim()) {
+        delete payload[f.name];
+      }
+    }
     let saved;
     if (props.isEdit) {
       const id = pkFields.value.map((f) => props.record[f]).join('~');
@@ -428,5 +481,19 @@ async function save() {
   border-radius: 8px;
   padding: 8px 20px;
   font-weight: 500;
+}
+
+.generic-form__signature {
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.generic-form__signature-label {
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1e293b;
 }
 </style>

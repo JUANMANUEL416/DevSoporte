@@ -52,7 +52,18 @@ DevSoporte
   for (const [to, nombre] of recipients) {
     try {
       const text = `Hola ${nombre},\n\n${body}`;
-      await sendMail({ to, subject, text });
+      await sendMail({
+        to,
+        subject,
+        text,
+        meta: {
+          cliente: cap.cliente || null,
+          nombrecliente: cliente?.nombrecliente || null,
+          contexto: 'capacitacion',
+          referencia: cap.cnscapacita,
+          cuerpo: text,
+        },
+      });
       notified++;
     } catch (err) {
       console.error('[email] Error enviando a', to, ':', err.message);

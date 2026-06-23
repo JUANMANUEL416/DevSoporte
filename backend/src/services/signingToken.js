@@ -52,6 +52,10 @@ export function verifySigningToken(token) {
     if (!payload.cnssoporte) throw new Error('Token inválido');
     return payload;
   }
+  if (payload.scope === 'actproy_firma') {
+    if (!payload.consecutivo) throw new Error('Token inválido');
+    return payload;
+  }
   throw new Error('Token inválido');
 }
 
@@ -70,6 +74,18 @@ export function createBitacoraFirmaToken({ cnssoporte }) {
     {
       scope: 'bitacora_firma',
       cnssoporte: String(cnssoporte),
+    },
+    SECRET,
+    { expiresIn: `${days}d` },
+  );
+}
+
+export function createActproyFirmaToken({ consecutivo }) {
+  const days = Number(process.env.SIGNING_TOKEN_EXPIRES_DAYS) || 14;
+  return jwt.sign(
+    {
+      scope: 'actproy_firma',
+      consecutivo: String(consecutivo),
     },
     SECRET,
     { expiresIn: `${days}d` },

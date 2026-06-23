@@ -19,24 +19,15 @@
         <q-inner-loading :showing="loading" />
 
         <template v-if="!loading">
-          <q-banner v-if="isActaMode" dense rounded class="notify-dialog__info">
-            El acta va <strong>al contacto del cliente (Para)</strong>; el
-            <strong>equipo de trabajo en copia (CC)</strong>.
-            Se adjunta el <strong>PDF del registro de asistencia</strong>.
-          </q-banner>
-          <q-banner v-else-if="isBitacoraMode" dense rounded class="notify-dialog__info notify-dialog__info--bitacora">
-            El correo va al <strong>funcionario que solicitó el soporte (Para)</strong>; el
-            <strong>equipo de la clínica en copia (CC)</strong>.
-            Incluye enlace para <strong>firmar la aceptación de la solución</strong>.
-          </q-banner>
-          <q-banner v-else-if="isSemanaReportMode" dense rounded class="notify-dialog__info notify-dialog__info--bitacora">
-            El reporte va al <strong>equipo de trabajo (Para)</strong> con el
-            <strong>PDF de la bitácora semanal</strong> adjunto.
-          </q-banner>
-
           <template v-if="isSplitRecipientsMode">
             <div class="notify-dialog__recipients-split">
-              <section class="notify-dialog__section">
+              <section
+                class="notify-dialog__section"
+                :class="{ 'notify-dialog__section--drop-active': dragOverZone === 'to' }"
+                @dragover.prevent="onDragOver('to')"
+                @dragleave="onDragLeave('to')"
+                @drop.prevent="onDrop('to', $event)"
+              >
                 <div class="notify-dialog__section-head">
                   <span class="notify-dialog__section-title">
                     <q-icon name="person" size="15px" class="q-mr-xs" />
@@ -47,24 +38,53 @@
                     <q-btn flat dense color="grey-7" label="Ninguno" @click="selectedTo = []" />
                   </div>
                 </div>
-                <div v-if="contactosTo.length" class="notify-dialog__grid">
-                  <label
-                    v-for="c in contactosTo"
+                <div v-if="displayContactosTo.length" class="notify-dialog__grid">
+                  <div
+                    v-for="c in displayContactosTo"
                     :key="c.id"
                     class="notify-dialog__card notify-dialog__card--to"
-                    :class="{ 'notify-dialog__card--selected': selectedTo.includes(c.email) }"
+                    :class="{
+                      'notify-dialog__card--selected': selectedTo.includes(c.email),
+                      'notify-dialog__card--dragging': draggingEmail === c.email,
+                    }"
+                    draggable="!isEquipoOnlyMode"
+                    @dragstart="onDragStart(c, 'to', $event)"
+                    @dragend="onDragEnd"
                   >
-                    <q-checkbox v-model="selectedTo" :val="c.email" color="primary" dense />
+                    <q-checkbox v-model="selectedTo" :val="c.email" color="primary" dense @click.stop />
                     <div class="notify-dialog__card-text">
-                      <span class="notify-dialog__card-name">{{ c.nombre || c.email }}</span>
-                      <span class="notify-dialog__card-meta">{{ c.email }}</span>
+                      <span class="notify-dialog__card-line">
+                        <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                        {{ contactCardLabel(c) }}
+                        <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
+                      </span>
                     </div>
-                  </label>
+                    <q-btn
+                      v-if="!isEquipoOnlyMode"
+                      flat
+                      dense
+                      round
+                      size="xs"
+                      icon="arrow_forward"
+                      color="grey-7"
+                      class="notify-dialog__move-btn"
+                      @click.stop="moveContact(c, 'to', 'cc')"
+                    >
+                      <q-tooltip>Mover a CC</q-tooltip>
+                    </q-btn>
+                  </div>
                 </div>
-                <p v-else class="notify-dialog__empty-hint">Sin contactos de cliente.</p>
+                <p v-else class="notify-dialog__empty-hint">Sin contactos en Para. Arrastre aquí o agregue manualmente.</p>
               </section>
 
-              <section v-if="!isEquipoOnlyMode" class="notify-dialog__section">
+              <section
+                v-if="!isEquipoOnlyMode"
+                class="notify-dialog__section"
+                :class="{ 'notify-dialog__section--drop-active': dragOverZone === 'cc' }"
+                @dragover.prevent="onDragOver('cc')"
+                @dragleave="onDragLeave('cc')"
+                @drop.prevent="onDrop('cc', $event)"
+              >
                 <div class="notify-dialog__section-head">
                   <span class="notify-dialog__section-title">
                     <q-icon name="groups" size="15px" class="q-mr-xs" />
@@ -75,21 +95,42 @@
                     <q-btn flat dense color="grey-7" label="Ninguno" @click="selectedCc = []" />
                   </div>
                 </div>
-                <div v-if="contactosCc.length" class="notify-dialog__grid">
-                  <label
-                    v-for="c in contactosCc"
+                <div v-if="displayContactosCc.length" class="notify-dialog__grid">
+                  <div
+                    v-for="c in displayContactosCc"
                     :key="c.id"
                     class="notify-dialog__card notify-dialog__card--cc"
-                    :class="{ 'notify-dialog__card--selected': selectedCc.includes(c.email) }"
+                    :class="{
+                      'notify-dialog__card--selected': selectedCc.includes(c.email),
+                      'notify-dialog__card--dragging': draggingEmail === c.email,
+                    }"
+                    draggable="!isEquipoOnlyMode"
+                    @dragstart="onDragStart(c, 'cc', $event)"
+                    @dragend="onDragEnd"
                   >
-                    <q-checkbox v-model="selectedCc" :val="c.email" color="teal" dense />
+                    <q-checkbox v-model="selectedCc" :val="c.email" color="teal" dense @click.stop />
                     <div class="notify-dialog__card-text">
-                      <span class="notify-dialog__card-name">{{ c.nombre || c.email }}</span>
-                      <span class="notify-dialog__card-meta">{{ c.email }}</span>
+                      <span class="notify-dialog__card-line">
+                        <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                        {{ contactCardLabel(c) }}
+                        <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
+                      </span>
                     </div>
-                  </label>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      size="xs"
+                      icon="arrow_back"
+                      color="grey-7"
+                      class="notify-dialog__move-btn"
+                      @click.stop="moveContact(c, 'cc', 'to')"
+                    >
+                      <q-tooltip>Mover a Para</q-tooltip>
+                    </q-btn>
+                  </div>
                 </div>
-                <p v-else class="notify-dialog__empty-hint">Sin equipo configurado.</p>
+                <p v-else class="notify-dialog__empty-hint">Sin contactos en CC. Arrastre aquí desde Para.</p>
               </section>
             </div>
           </template>
@@ -111,10 +152,10 @@
               >
                 <q-checkbox v-model="selected" :val="c.email" color="primary" dense />
                 <div class="notify-dialog__card-text">
-                  <span class="notify-dialog__card-name">{{ c.nombre || c.email }}</span>
-                  <span class="notify-dialog__card-meta">
-                    <q-badge v-if="c.manual" dense color="grey-7" label="Manual" class="q-mr-xs" />
-                    {{ c.cargo || 'Sin cargo' }} · {{ c.email }}
+                  <span class="notify-dialog__card-line">
+                    <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                    {{ contactCardLabel(c) }}
+                    <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
                   </span>
                 </div>
               </label>
@@ -210,7 +251,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import { clientesApi, notificacionApi, bitacoraApi } from 'src/services/api';
+import { clientesApi, notificacionApi, bitacoraApi, actproyApi } from 'src/services/api';
 
 const emit = defineEmits(['update:modelValue', 'send']);
 
@@ -242,6 +283,9 @@ const defaultSubject = ref('');
 const defaultBody = ref('');
 const manualEmail = ref('');
 const manualRol = ref('to');
+const draggingEmail = ref('');
+const dragOverZone = ref('');
+const dragPayload = ref(null);
 
 const manualRolOptions = [
   { label: 'Para (cliente)', value: 'to' },
@@ -256,12 +300,19 @@ const open = computed({
 const isActaMode = computed(() => props.notifyType === 'capacitacion');
 const isBitacoraMode = computed(() => props.notifyType === 'bitacora');
 const isSemanaReportMode = computed(() => props.notifyType === 'bitacora_semana');
-const isSplitRecipientsMode = computed(() => isActaMode.value || isBitacoraMode.value || isSemanaReportMode.value);
+const isActproyMode = computed(() => props.notifyType === 'actproy');
+const isSplitRecipientsMode = computed(() =>
+  isActaMode.value || isBitacoraMode.value || isSemanaReportMode.value || isActproyMode.value,
+);
 const isEquipoOnlyMode = computed(() => isSemanaReportMode.value);
 
 const allContactos = computed(() => [...contactos.value, ...manualContactos.value]);
 
 const allContactosTo = computed(() => [...contactosTo.value, ...manualContactosTo.value]);
+
+const displayContactosTo = computed(() => allContactosTo.value);
+
+const displayContactosCc = computed(() => [...contactosCc.value, ...manualContactosCc.value]);
 
 const canSend = computed(() => {
   if (!subject.value.trim() || !bodyText.value.trim()) return false;
@@ -282,6 +333,17 @@ const previewSample = computed(() => {
       .map((c) => c.email)
       .join(', ') || '(ninguno)';
     return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}`;
+  }
+  if (isActproyMode.value) {
+    const para = allContactosTo.value
+      .filter((c) => selectedTo.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(sin destinatarios)';
+    const copia = [...contactosCc.value, ...manualContactosCc.value]
+      .filter((c) => selectedCc.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(ninguno)';
+    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF informe firmado)`;
   }
   if (isBitacoraMode.value) {
     const para = allContactosTo.value
@@ -352,6 +414,35 @@ watch(
           $q.notify({
             type: 'warning',
             message: 'El equipo no tiene correos registrados. Agregue uno manualmente en Para.',
+          });
+        }
+        return;
+      }
+
+      if (isActproyMode.value) {
+        const [destData, previewData] = await Promise.all([
+          clientesApi.destinatarios(props.clienteCodigo),
+          actproyApi.previewInforme(props.recordId),
+        ]);
+        clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
+        defaultSubject.value = previewData.subject || '';
+        defaultBody.value = previewData.body || '';
+        subject.value = previewData.subject || '';
+        bodyText.value = previewData.body || '';
+        contactosTo.value = (destData.contactosConEmail || []).map((c, i) => ({
+          ...c,
+          id: `to-${i}-${c.email}`,
+        }));
+        contactosCc.value = (destData.equipoConEmail || []).map((c, i) => ({
+          ...c,
+          id: `cc-${i}-${c.email}`,
+        }));
+        selectedTo.value = contactosTo.value.map((c) => c.email);
+        selectedCc.value = contactosCc.value.map((c) => c.email);
+        if (!contactosTo.value.length) {
+          $q.notify({
+            type: 'warning',
+            message: 'El cliente no tiene contactos con correo. Agregue uno manualmente en Para.',
           });
         }
         return;
@@ -428,12 +519,105 @@ function selectAll() {
   selected.value = allContactos.value.map((c) => c.email);
 }
 
+function contactCardLabel(c) {
+  const name = String(c?.nombre || '').trim();
+  const email = String(c?.email || '').trim();
+  if (name && name.toLowerCase() !== email.toLowerCase()) return name;
+  return email;
+}
+
+function showEmailTooltip(c) {
+  const name = String(c?.nombre || '').trim();
+  const email = String(c?.email || '').trim();
+  return Boolean(name && email && name.toLowerCase() !== email.toLowerCase());
+}
+
 function selectAllTo() {
   selectedTo.value = allContactosTo.value.map((c) => c.email);
 }
 
 function selectAllCc() {
-  selectedCc.value = [...contactosCc.value, ...manualContactosCc.value].map((c) => c.email);
+  selectedCc.value = displayContactosCc.value.map((c) => c.email);
+}
+
+function removeFromZone(email, zone) {
+  const key = email.toLowerCase();
+  if (zone === 'to') {
+    contactosTo.value = contactosTo.value.filter((c) => c.email.toLowerCase() !== key);
+    manualContactosTo.value = manualContactosTo.value.filter((c) => c.email.toLowerCase() !== key);
+    selectedTo.value = selectedTo.value.filter((e) => e.toLowerCase() !== key);
+  } else {
+    contactosCc.value = contactosCc.value.filter((c) => c.email.toLowerCase() !== key);
+    manualContactosCc.value = manualContactosCc.value.filter((c) => c.email.toLowerCase() !== key);
+    selectedCc.value = selectedCc.value.filter((e) => e.toLowerCase() !== key);
+  }
+}
+
+function existsInZone(email, zone) {
+  const key = email.toLowerCase();
+  const list = zone === 'to' ? displayContactosTo.value : displayContactosCc.value;
+  return list.some((c) => c.email.toLowerCase() === key);
+}
+
+function moveContact(contact, fromZone, toZone) {
+  if (fromZone === toZone || isEquipoOnlyMode.value) return;
+  const email = contact.email;
+  if (existsInZone(email, toZone)) {
+    $q.notify({ type: 'info', message: 'Ese correo ya está en la columna destino' });
+    return;
+  }
+  const wasSelected = fromZone === 'to'
+    ? selectedTo.value.includes(email)
+    : selectedCc.value.includes(email);
+  removeFromZone(email, fromZone);
+  const entry = {
+    ...contact,
+    id: `${toZone}-${Date.now()}-${email}`,
+  };
+  if (toZone === 'to') {
+    if (contact.manual) manualContactosTo.value.push(entry);
+    else contactosTo.value.push(entry);
+    if (wasSelected && !selectedTo.value.includes(email)) selectedTo.value.push(email);
+  } else {
+    if (contact.manual) manualContactosCc.value.push(entry);
+    else contactosCc.value.push(entry);
+    if (wasSelected && !selectedCc.value.includes(email)) selectedCc.value.push(email);
+  }
+}
+
+function onDragStart(contact, fromZone, event) {
+  if (isEquipoOnlyMode.value) return;
+  draggingEmail.value = contact.email;
+  dragPayload.value = { contact, fromZone };
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', contact.email);
+  }
+}
+
+function onDragEnd() {
+  draggingEmail.value = '';
+  dragOverZone.value = '';
+  dragPayload.value = null;
+}
+
+function onDragOver(zone) {
+  if (isEquipoOnlyMode.value || !dragPayload.value) return;
+  dragOverZone.value = zone;
+}
+
+function onDragLeave(zone) {
+  if (dragOverZone.value === zone) dragOverZone.value = '';
+}
+
+function onDrop(toZone, event) {
+  if (isEquipoOnlyMode.value) return;
+  dragOverZone.value = '';
+  const payload = dragPayload.value;
+  if (!payload) return;
+  moveContact(payload.contact, payload.fromZone, toZone);
+  onDragEnd();
+  event.stopPropagation();
 }
 
 function restorePreview() {
@@ -600,11 +784,28 @@ function confirmSend() {
   }
 }
 
+.notify-dialog__drag-hint {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  color: #64748b;
+  background: #fff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+
 .notify-dialog__section {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &--drop-active {
+    border-color: #1565c0;
+    box-shadow: inset 0 0 0 2px rgba(21, 101, 192, 0.15);
+    background: #f8fbff;
+  }
 }
 
 .notify-dialog__recipients-split {
@@ -618,7 +819,7 @@ function confirmSend() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   flex-shrink: 0;
 }
 
@@ -637,20 +838,39 @@ function confirmSend() {
 
 .notify-dialog__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 5px;
 }
 
 .notify-dialog__card {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 8px 10px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  min-height: 0;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #fafafa;
-  cursor: pointer;
-  transition: border-color 0.15s ease;
+  cursor: grab;
+  transition: border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+
+  :deep(.q-checkbox) {
+    margin-top: 0;
+  }
+
+  :deep(.q-checkbox__inner) {
+    font-size: 28px;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &--dragging {
+    opacity: 0.45;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  }
 
   &--selected {
     background: #fff;
@@ -665,27 +885,49 @@ function confirmSend() {
   }
 }
 
+.notify-dialog__move-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+  min-width: 22px;
+  min-height: 22px;
+}
+
 .notify-dialog__card-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
+  flex: 1;
 }
 
-.notify-dialog__card-name {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #1e293b;
+.notify-dialog__card-line {
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: #334155;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.notify-dialog__card-name {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
 .notify-dialog__card-meta {
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   color: #64748b;
-  line-height: 1.3;
-  word-break: break-all;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .notify-dialog__empty-hint {

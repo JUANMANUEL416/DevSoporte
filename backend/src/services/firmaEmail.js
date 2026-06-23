@@ -87,7 +87,19 @@ DevSoporte
 <p>DevSoporte</p>
   `.trim();
 
-  const mail = await sendMail({ to: email, subject, text, html });
+  const mail = await sendMail({
+    to: email,
+    subject,
+    text,
+    html,
+    meta: {
+      cliente: row.cliente || null,
+      nombrecliente: row.nombrecliente || null,
+      contexto: 'firma',
+      referencia: row.cnscapacita,
+      cuerpo: text,
+    },
+  });
   if (mail.skipped) {
     console.log('[email] Firma', row.cnscapacita, row.item, '— SMTP no configurado');
     return { sent: false, reason: 'smtp_no_configurado', nombres: row.nombres, email };

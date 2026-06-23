@@ -26,9 +26,19 @@ import { invitacionesRouter } from './routes/invitaciones.js';
 import { publicRegistroRouter, registroLinkHandler } from './routes/registroPublico.js';
 import dashboardRoutes from './routes/dashboard.js';
 import semanasRoutes from './routes/semanas.js';
+import correosRoutes from './routes/correos.js';
 import bitacoraCerrarRoutes from './routes/bitacoraCerrar.js';
 import bitacoraSemanaClienteRoutes from './routes/bitacoraSemanaCliente.js';
 import { bitacoraPdfHandler } from './routes/bitacoraPdf.js';
+import {
+  actproyPdfHandler,
+  actproyFirmaEstadoHandler,
+  actproyEnviarFirmaHandler,
+  actproyPreviewInformeHandler,
+  actproyEnviarInformeHandler,
+} from './routes/actproy.js';
+import { beforeActproyCreate, beforeActproyUpdate } from './services/actproyHooks.js';
+import { beforeSoportCreate, beforeSoportUpdate } from './services/soportHooks.js';
 
 async function ensureCapacitacionAbierta(cnscapacita) {
   if (!cnscapacita) return;
@@ -109,6 +119,14 @@ const entityHooks = {
     beforeUpdate: beforeBitacoraUpdate,
     beforeDelete: beforeBitacoraDelete,
   },
+  actividades_proyecto: {
+    beforeCreate: beforeActproyCreate,
+    beforeUpdate: beforeActproyUpdate,
+  },
+  soportes: {
+    beforeCreate: beforeSoportCreate,
+    beforeUpdate: beforeSoportUpdate,
+  },
 };
 
 // DevSoporte API
@@ -142,6 +160,7 @@ app.use('/api/public/registro', publicRegistroRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/semanas', requireAuth, semanasRoutes);
+app.use('/api/correos', requireAuth, correosRoutes);
 
 // Expone la lista de entidades disponibles (útil para el menú dinámico).
 app.get('/api/entities', requireAuth, (req, res) => {
@@ -157,7 +176,7 @@ app.get('/api/capacitaciones/:id/preview-notificacion', requireAuth, previewCapa
 app.get('/api/bitacora/:id/preview-notificacion', requireAuth, previewBitacoraHandler);
 app.post('/api/capacitaciones/:id/enviar-notificacion', requireAuth, async (req, res, next) => {
   try {
-    const result = await enviarNotificacionCapacitacion(req.params.id, req.body);
+    const result = await enviarNotificacionCapacitacion(req.params.id, req.body, req.user?.usuario);
     if (result.error) return res.status(400).json(result);
     res.json(result);
   } catch (err) {
@@ -167,7 +186,7 @@ app.post('/api/capacitaciones/:id/enviar-notificacion', requireAuth, async (req,
 });
 app.post('/api/bitacora/:id/enviar-notificacion', requireAuth, async (req, res, next) => {
   try {
-    const result = await enviarNotificacionBitacora(req.params.id, req.body);
+    const result = await enviarNotificacionBitacora(req.params.id, req.body, req.user?.usuario);
     if (result.error) return res.status(400).json(result);
     res.json(result);
   } catch (err) {
@@ -184,6 +203,12 @@ app.get('/api/capacitaciones/:id/registro-link', requireAuth, registroLinkHandle
 app.post('/api/capacitaciones/:id/enviar-firmas', requireAuth, enviarFirmasCapacitacionHandler);
 app.use('/api/capacitaciones/:id/invitaciones', requireAuth, invitacionesRouter);
 app.post('/api/asistentes/:id/enviar-firma', requireAuth, enviarFirmaAsistenteHandler);
+
+app.get('/api/actividades_proyecto/:id/pdf', requireAuth, actproyPdfHandler);
+app.get('/api/actividades_proyecto/:id/firma-estado', requireAuth, actproyFirmaEstadoHandler);
+app.post('/api/actividades_proyecto/:id/enviar-firma', requireAuth, actproyEnviarFirmaHandler);
+app.get('/api/actividades_proyecto/:id/preview-informe', requireAuth, actproyPreviewInformeHandler);
+app.post('/api/actividades_proyecto/:id/enviar-informe', requireAuth, actproyEnviarInformeHandler);
 
 // Monta un CRUD REST por cada entidad migrada del diccionario Clarion.
 for (const [key, entity] of Object.entries(entities)) {

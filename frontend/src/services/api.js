@@ -60,6 +60,30 @@ export const bitacoraApi = {
     }),
 };
 
+export const actproyApi = {
+  pdf: (id) =>
+    api.get(`/actividades_proyecto/${encodeURIComponent(id)}/pdf`, { responseType: 'blob' }),
+  firmaEstado: (id) =>
+    api.get(`/actividades_proyecto/${encodeURIComponent(id)}/firma-estado`).then((r) => r.data),
+  enviarFirma: (id, payload = {}) =>
+    api.post(`/actividades_proyecto/${encodeURIComponent(id)}/enviar-firma`, payload).then((r) => r.data),
+  previewInforme: (id) =>
+    api.get(`/actividades_proyecto/${encodeURIComponent(id)}/preview-informe`).then((r) => r.data),
+  enviarInforme: (id, payload = {}) =>
+    api.post(`/actividades_proyecto/${encodeURIComponent(id)}/enviar-informe`, payload).then((r) => r.data),
+};
+
+export const correosApi = {
+  list: (params = {}) => api.get('/correos', { params }).then((r) => r.data),
+  get: (id) => api.get(`/correos/${encodeURIComponent(id)}`).then((r) => r.data),
+  getPlantilla: () => api.get('/correos/plantilla').then((r) => r.data),
+  savePlantilla: (payload) => api.put('/correos/plantilla', payload).then((r) => r.data),
+  enviar: (formData) =>
+    api
+      .post('/correos/enviar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .then((r) => r.data),
+};
+
 export const notificacionApi = {
   previewCapacitacion: (id) =>
     api.get(`/capacitaciones/${encodeURIComponent(id)}/preview-notificacion`).then((r) => r.data),

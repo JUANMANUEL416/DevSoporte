@@ -8,6 +8,17 @@
 //   - una página de listado (GenericListPage) que usa estas columnas
 //   - un formulario (GenericForm) que usa estos campos
 
+export const ESTADO_AI_OPTIONS = [
+  { label: 'Activo', value: 'A' },
+  { label: 'Inactivo', value: 'I' },
+];
+
+export function fmtEstadoAI(value) {
+  if (value === 'A') return 'Activo';
+  if (value === 'I') return 'Inactivo';
+  return value || '';
+}
+
 export const modules = [
   // -------------------- Configuración --------------------
   {
@@ -233,6 +244,59 @@ export const modules = [
   },
 
   // -------------------- Soporte --------------------
+  {
+    group: 'Soporte',
+    icon: 'mark_email_unread',
+    resource: 'correos',
+    title: 'Bandeja de Correos',
+    page: 'BandejaCorreosPage',
+    columns: [],
+    fields: [],
+  },
+  {
+    group: 'Soporte',
+    icon: 'assignment_turned_in',
+    resource: 'actividades_proyecto',
+    title: 'Informe de Actividades',
+    page: 'ActividadesProyectoPage',
+    formCols: 2,
+    idField: 'consecutivo',
+    columns: [
+      { name: 'consecutivo', label: 'Consecutivo', field: 'consecutivo', align: 'left', sortable: true },
+      { name: 'fecha', label: 'Fecha', field: 'fecha', align: 'left', format: (v) => fmtDate(v) },
+      { name: 'nombrecliente', label: 'Proyecto / Cliente', field: 'nombrecliente', align: 'left' },
+      { name: 'ingeniero', label: 'Ingeniero', field: 'ingeniero', align: 'left' },
+      { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
+    ],
+    fields: [
+      { name: 'consecutivo', label: 'Consecutivo', type: 'text', hideOnCreate: true, fixed: true },
+      { name: 'estado', label: 'Estado', type: 'text', fixed: true, hideOnCreate: true },
+      { name: 'fecha', label: 'Fecha de soporte', type: 'date', defaultToday: true, required: true },
+      {
+        name: 'cliente',
+        label: 'Proyecto / Cliente',
+        type: 'lookup',
+        lookupResource: 'clientes',
+        lookupValue: 'codigo',
+        lookupLabel: 'nombrecliente',
+        fillFrom: { ciudad: 'ciudad' },
+        required: true,
+      },
+      { name: 'ciudad', label: 'Ciudad', type: 'text' },
+      {
+        name: 'ingeniero',
+        label: 'Ingeniero asignado de soporte',
+        type: 'lookup',
+        lookupResource: 'soportes',
+        lookupValue: 'nombre',
+        lookupLabel: 'nombre',
+        lookupCodeField: 'codigo',
+      },
+      { name: 'duracion', label: 'Duración', type: 'text' },
+      { name: 'actividades', label: 'Actividades realizadas', type: 'textarea', colSpan: 2 },
+      { name: 'pendientes', label: 'Actividades pendientes', type: 'textarea', colSpan: 2 },
+    ],
+  },
   {
     group: 'Soporte',
     icon: 'support_agent',
@@ -525,7 +589,7 @@ export const modules = [
     columns: [
       { name: 'codigo', label: 'Código', field: 'codigo', align: 'left', sortable: true },
       { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'left', sortable: true },
-      { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
+      { name: 'estado', label: 'Estado', field: 'estado', align: 'left', format: fmtEstadoAI },
     ],
     fields: [
       { name: 'codigo', label: 'Código', type: 'text', required: true },
@@ -534,7 +598,7 @@ export const modules = [
         name: 'estado',
         label: 'Estado',
         type: 'select',
-        options: ['A', 'I'],
+        options: ESTADO_AI_OPTIONS,
         default: 'A',
       },
     ],
@@ -545,15 +609,45 @@ export const modules = [
     resource: 'soportes',
     title: 'Técnicos de Soporte',
     idField: 'codigo',
+    formCols: 4,
+    fetchOnEdit: true,
     columns: [
       { name: 'codigo', label: 'Código', field: 'codigo', align: 'left', sortable: true },
       { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'left' },
-      { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
+      { name: 'usuario', label: 'Usuario acceso', field: 'usuario', align: 'left' },
+      { name: 'estado', label: 'Estado', field: 'estado', align: 'left', format: fmtEstadoAI },
+      {
+        name: 'firma_fecha',
+        label: 'Firma',
+        field: 'firma_fecha',
+        align: 'center',
+        format: (v) => (v ? 'Registrada' : 'Pendiente'),
+      },
     ],
     fields: [
-      { name: 'codigo', label: 'Código', type: 'text', required: true },
-      { name: 'nombre', label: 'Nombre', type: 'text' },
-      { name: 'estado', label: 'Estado', type: 'text' },
+      { name: 'codigo', label: 'Código', type: 'text', hideOnCreate: true, fixed: true },
+      { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+      {
+        name: 'usuario',
+        label: 'Usuario de acceso',
+        type: 'text',
+        hint: 'Para iniciar sesión en DevSoporte',
+      },
+      {
+        name: 'clave',
+        label: 'Contraseña',
+        type: 'password',
+        editHint: 'Dejar vacío para no cambiar',
+        hint: 'Requerida junto con el usuario de acceso',
+      },
+      {
+        name: 'estado',
+        label: 'Estado',
+        type: 'select',
+        options: ESTADO_AI_OPTIONS,
+        default: 'A',
+      },
+      { name: 'firma', label: 'Firma digital', type: 'signature' },
     ],
   },
 

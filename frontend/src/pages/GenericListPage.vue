@@ -150,8 +150,20 @@ function openCreate() {
 }
 
 function openEdit(row) {
-  current.value = { ...row };
   isEdit.value = true;
+  if (mod.value?.fetchOnEdit) {
+    useResource(props.resource)
+      .get(rowKey(row))
+      .then((full) => {
+        current.value = { ...full };
+        formOpen.value = true;
+      })
+      .catch((err) => {
+        $q.notify({ type: 'negative', message: err.response?.data?.error || 'No se pudo cargar el registro' });
+      });
+    return;
+  }
+  current.value = { ...row };
   formOpen.value = true;
 }
 

@@ -74,7 +74,19 @@ DevSoporte
 <p style="font-size:12px;color:#666;">${url}</p>
   `.trim();
 
-  const mail = await sendMail({ to: inv.email, subject, text, html });
+  const mail = await sendMail({
+    to: inv.email,
+    subject,
+    text,
+    html,
+    meta: {
+      cliente: inv.cliente || null,
+      nombrecliente: inv.nombrecliente || null,
+      contexto: 'invitacion',
+      referencia: inv.cnscapacita,
+      cuerpo: text,
+    },
+  });
   if (mail.skipped) {
     return { sent: false, reason: 'smtp_no_configurado', email: inv.email };
   }

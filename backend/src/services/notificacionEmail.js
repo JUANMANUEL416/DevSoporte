@@ -190,7 +190,7 @@ function resolveFuncionarioDestinatarios(funcionario, emailList) {
   });
 }
 
-async function sendToDestinatarios({ destinatarios, subject, buildMessage }) {
+async function sendToDestinatarios({ destinatarios, subject, buildMessage, meta }) {
   if (!destinatarios.length) {
     return { sent: 0, total: 0, details: [], error: 'Sin destinatarios con email' };
   }
@@ -201,7 +201,7 @@ async function sendToDestinatarios({ destinatarios, subject, buildMessage }) {
   for (const d of destinatarios) {
     try {
       const { text, html } = buildMessage(d);
-      await sendMail({ to: d.email, subject, text, html });
+      await sendMail({ to: d.email, subject, text, html, meta: { ...meta, cuerpo: text } });
       sent++;
       details.push({ email: d.email, nombre: d.nombre, ok: true });
     } catch (err) {
@@ -232,6 +232,7 @@ async function sendActaCapacitacionEmail({
   subject,
   buildMessage,
   attachments = [],
+  meta,
 }) {
   if (!toList.length) {
     return { sent: 0, total: 0, details: [], error: 'Seleccione al menos un destinatario (Para)' };
@@ -243,7 +244,7 @@ async function sendActaCapacitacionEmail({
   const { text, html } = buildMessage({ nombre: saludoNombre });
 
   try {
-    await sendMail({ to, cc, subject, text, html, attachments });
+    await sendMail({ to, cc, subject, text, html, attachments, meta: { ...meta, cuerpo: text } });
     const details = [
       ...toList.map((d) => ({ email: d.email, nombre: d.nombre, rol: 'Para', ok: true })),
       ...ccList.map((d) => ({ email: d.email, nombre: d.nombre, rol: 'Copia', ok: true })),
@@ -322,7 +323,7 @@ export async function previewNotificacionBitacora(cnssoporte) {
   };
 }
 
-export async function enviarNotificacionCapacitacion(cnscapacita, body = {}) {
+export async function enviarNotificacionCapacitacion(cnscapacita, body = {}, usuario = null) {
   const capRes = await query('SELECT * FROM rasist WHERE cnscapacita = $1', [cnscapacita]);
   const cap = capRes.rows[0];
   if (!cap) {
@@ -373,10 +374,17 @@ export async function enviarNotificacionCapacitacion(cnscapacita, body = {}) {
       nombre: toList[0]?.nombre || cliente?.nombrecliente || 'estimado(a)',
     }),
     attachments,
+    meta: {
+      cliente: cap.cliente,
+      nombrecliente: cliente?.nombrecliente || null,
+      contexto: 'capacitacion',
+      referencia: cnscapacita,
+      usuario,
+    },
   });
 }
 
-export async function enviarNotificacionBitacora(cnssoporte, body = {}) {
+export async function enviarNotificacionBitacora(cnssoporte, body = {}, usuario = null) {
   const bitaRes = await query('SELECT * FROM bita WHERE cnssoporte = $1', [cnssoporte]);
   const bita = bitaRes.rows[0];
   if (!bita) {
@@ -426,6 +434,13 @@ export async function enviarNotificacionBitacora(cnssoporte, body = {}) {
       nombre: toList[0]?.nombre || funcionario?.nombre || 'estimado(a)',
     }),
     attachments: [],
+    meta: {
+      cliente: bita.cliente,
+      nombrecliente: cliente?.nombrecliente || null,
+      contexto: 'bitacora',
+      referencia: cnssoporte,
+      usuario,
+    },
   });
 }
 
@@ -512,7 +527,7 @@ export async function previewNotificacionSemanaCliente(cnsbite, cliente) {
   return { subject: bundle.subject, body: bundle.body };
 }
 
-export async function enviarNotificacionSemanaCliente(cnsbite, cliente, body = {}) {
+export async function enviarNotificacionSemanaCliente(cnsbite, cliente, body = {}, usuario = null) {
   const biteClie = await getBiteClie(cnsbite, cliente);
   if ((biteClie?.estado || 'Abierta') !== 'Cerrada') {
     const err = new Error('Solo se puede reportar una semana de cliente cerrada');
@@ -558,5 +573,12 @@ export async function enviarNotificacionSemanaCliente(cnsbite, cliente, body = {
       nombre: toList[0]?.nombre || 'equipo',
     }),
     attachments,
+    meta: {
+      cliente,
+      nombrecliente: clienteRow?.nombrecliente || null,
+      contexto: 'bitacora_semana',
+      referencia: cnsbite,
+      usuario,
+    },
   });
 }

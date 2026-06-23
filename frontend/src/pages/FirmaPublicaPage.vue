@@ -54,6 +54,10 @@
               <div class="text-subtitle2">{{ info.funcionario || 'Funcionario' }}</div>
               <div class="text-caption text-grey">Soporte {{ info.cnssoporte }}</div>
             </template>
+            <template v-else-if="isActproy">
+              <div class="text-subtitle2">{{ info.cliente }}</div>
+              <div class="text-caption text-grey">Informe {{ info.consecutivo }}</div>
+            </template>
           </q-card-section>
 
           <q-separator />
@@ -79,6 +83,36 @@
                   <p>{{ info.observaciones || '—' }}</p>
                 </article>
               </div>
+            </div>
+            <div v-else-if="isActproy" class="firma-publica__bitacora">
+              <div class="text-body2 q-mb-sm">
+                <div><strong>Proyecto:</strong> {{ info.cliente }}</div>
+                <div><strong>Fecha:</strong> {{ fmtFecha(info.fecha) }}</div>
+                <div v-if="info.ciudad"><strong>Ciudad:</strong> {{ info.ciudad }}</div>
+                <div v-if="info.ingeniero"><strong>Ingeniero:</strong> {{ info.ingeniero }}</div>
+              </div>
+              <div class="firma-publica__blocks">
+                <article class="firma-publica__block">
+                  <h4>Actividades realizadas</h4>
+                  <div
+                    v-if="info.actividades"
+                    class="firma-publica__rich"
+                    v-html="info.actividades"
+                  />
+                  <p v-else>—</p>
+                </article>
+                <article v-if="info.pendientes" class="firma-publica__block">
+                  <h4>Actividades pendientes</h4>
+                  <div class="firma-publica__rich" v-html="info.pendientes" />
+                </article>
+              </div>
+              <q-input
+                v-model="form.nombres"
+                label="Nombre de quien firma"
+                outlined
+                dense
+                class="q-mt-sm"
+              />
             </div>
             <div v-else class="text-body2 q-mb-md">
               <div><strong>Cliente:</strong> {{ info.cliente }}</div>
@@ -160,23 +194,26 @@ const form = ref({ email: '', documento: '', nombres: '', cargo: '' });
 
 const isInvite = computed(() => info.value?.mode === 'invite');
 const isBitacora = computed(() => info.value?.mode === 'bitacora');
+const isActproy = computed(() => info.value?.mode === 'actproy');
 const isCapacitacionFirma = computed(() => info.value?.mode === 'firma' || isInvite.value);
 const isBitacoraBlocked = computed(() => isBitacora.value && info.value?.puedeFirmar === false);
 
 const pageTitle = computed(() => {
   if (isBitacora.value) return 'Firma aceptación de la solución';
+  if (isActproy.value) return 'Firma de aceptación del informe';
   if (isInvite.value) return 'Registro y firma de asistencia';
   return 'Firma de asistencia';
 });
 
 const signatureTitle = computed(() => (
-  isBitacora.value
+  isBitacora.value || isActproy.value
     ? 'Diligencie su firma o suba una imagen (PNG/JPG)'
     : 'Diligencie su firma en el recuadro'
 ));
 
 const doneMessage = computed(() => {
   if (isBitacora.value) return 'Su firma de aceptación fue registrada correctamente.';
+  if (isActproy.value) return 'Su firma del informe fue registrada correctamente.';
   if (isInvite.value) return 'Sus datos y firma fueron registrados.';
   return 'Su firma fue registrada correctamente.';
 });
@@ -196,9 +233,9 @@ async function loadInfo() {
   try {
     const { data } = await api.get(`/public/firma/${encodeURIComponent(token)}`);
     info.value = data;
-    if (data.mode === 'bitacora' && data.puedeFirmar === false) {
+    if ((data.mode === 'bitacora' || data.mode === 'actproy') && data.puedeFirmar === false) {
       blocked.value = true;
-      blockedMessage.value = data.bloqueoMotivo || 'No se puede firmar este soporte.';
+      blockedMessage.value = data.bloqueoMotivo || 'No se puede firmar.';
       return;
     }
     if (data.mode === 'invite') {
@@ -229,12 +266,17 @@ async function onSave(dataUrl) {
 
   saving.value = true;
   try {
-    const body = isInvite.value
-      ? { ...form.value, firma: dataUrl }
-      : { firma: dataUrl };
+    let body;
+    if (isInvite.value) {
+      body = { ...form.value, firma: dataUrl };
+    } else if (isActproy.value) {
+      body = { firma: dataUrl, nombres: form.value.nombres };
+    } else {
+      body = { firma: dataUrl };
+    }
     await api.post(`/public/firma/${encodeURIComponent(token)}`, body);
     done.value = true;
-    $q.notify({ type: 'positive', message: isBitacora.value ? 'Aceptación firmada' : 'Firma guardada' });
+    $q.notify({ type: 'positive', message: isBitacora.value || isActproy.value ? 'Aceptación firmada' : 'Firma guardada' });
   } catch (err) {
     $q.notify({
       type: 'negative',
@@ -288,5 +330,21 @@ onMounted(loadInfo);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.firma-publica__rich {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.firma-publica__rich :deep(p) {
+  margin: 0 0 0.5em;
+}
+
+.firma-publica__rich :deep(ul),
+.firma-publica__rich :deep(ol) {
+  margin: 0.25em 0 0.5em;
+  padding-left: 1.25em;
 }
 </style>

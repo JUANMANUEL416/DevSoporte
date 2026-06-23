@@ -85,7 +85,11 @@ END $$;
 CREATE TABLE IF NOT EXISTS soport (
     codigo VARCHAR(20) PRIMARY KEY,
     nombre VARCHAR(100),
-    estado VARCHAR(10)
+    estado VARCHAR(10),
+    usuario VARCHAR(20),
+    clave VARCHAR(255),
+    firma TEXT,
+    firma_fecha TIMESTAMPTZ
 );
 
 -- ----------------------------------------------------------------------------
@@ -475,3 +479,59 @@ CREATE TABLE IF NOT EXISTS rasist_invite (
     UNIQUE (cnscapacita, email)
 );
 CREATE INDEX IF NOT EXISTS rasist_invite_cnscapacita ON rasist_invite (cnscapacita);
+
+-- ----------------------------------------------------------------------------
+-- Bandeja / bitácora de correos enviados (CORREOS)
+-- Registra cada envío realizado por el sistema (fecha, destinatario, éxito).
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS correos (
+    id                SERIAL PRIMARY KEY,
+    fecha             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    cliente           VARCHAR(20),
+    nombrecliente     VARCHAR(100),
+    contexto          VARCHAR(30) NOT NULL DEFAULT 'bandeja',
+    referencia        VARCHAR(40),
+    para              TEXT,
+    cc                TEXT,
+    asunto            TEXT,
+    cuerpo            TEXT,
+    adjuntos          TEXT,
+    num_destinatarios INTEGER DEFAULT 0,
+    exito             BOOLEAN NOT NULL DEFAULT FALSE,
+    error             TEXT,
+    usuario           VARCHAR(20)
+);
+CREATE INDEX IF NOT EXISTS correos_cliente ON correos (cliente, fecha DESC);
+CREATE INDEX IF NOT EXISTS correos_fecha ON correos (fecha DESC);
+CREATE INDEX IF NOT EXISTS correos_contexto ON correos (contexto, fecha DESC);
+
+-- Plantilla y firma global para correos de la bandeja
+CREATE TABLE IF NOT EXISTS correo_plantilla (
+    id               SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    cuerpo_template  TEXT NOT NULL,
+    firma_texto      TEXT,
+    firma_imagen     TEXT,
+    firma_html       TEXT,
+    updated_at       TIMESTAMPTZ DEFAULT NOW(),
+    updated_by       VARCHAR(20)
+);
+
+-- ----------------------------------------------------------------------------
+-- Actividades Realizadas en Proyectos / Informe (ACTPROY) — IXIMS-REG-029
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS actproy (
+    consecutivo      VARCHAR(20) PRIMARY KEY,
+    fecha            TIMESTAMP,
+    cliente          VARCHAR(20),
+    ciudad           VARCHAR(60),
+    ingeniero        VARCHAR(100),
+    duracion         VARCHAR(40),
+    actividades      TEXT,
+    pendientes       TEXT,
+    estado           VARCHAR(20) DEFAULT 'Abierto',
+    firma_cli        TEXT,
+    firma_cli_fecha  TIMESTAMPTZ,
+    firma_cli_nombre VARCHAR(120)
+);
+CREATE INDEX IF NOT EXISTS actproy_cliente ON actproy (cliente, consecutivo);
+CREATE INDEX IF NOT EXISTS actproy_fecha ON actproy (fecha DESC);

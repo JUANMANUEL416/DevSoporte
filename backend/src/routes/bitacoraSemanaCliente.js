@@ -56,6 +56,7 @@ router.post('/semana/:cnsbite/cliente/:cliente/enviar-reporte', async (req, res,
       req.params.cnsbite,
       req.params.cliente,
       req.body || {},
+      req.user?.usuario,
     );
     if (result.error) return res.status(400).json(result);
     res.json(result);

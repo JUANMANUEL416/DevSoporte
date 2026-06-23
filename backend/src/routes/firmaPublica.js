@@ -9,6 +9,7 @@ import {
 } from '../services/firmaEmail.js';
 import { loadInvitePublicContext, registerAsistenteFromInvite } from '../services/registroAsistente.js';
 import { loadBitacoraFirmaContext, saveBitacoraFirma, getBitacoraFirmaEstado } from '../services/bitacoraFirma.js';
+import { getActproyFirmaEstado, saveActproyFirma } from '../services/actproyFirma.js';
 
 function validateFirmaDataUrl(firma) {
   if (!firma || typeof firma !== 'string') return false;
@@ -94,6 +95,27 @@ publicFirmaRouter.get('/:token', async (req, res, next) => {
       });
     }
 
+    if (payload.scope === 'actproy_firma') {
+      const estado = await getActproyFirmaEstado(payload.consecutivo);
+      if (!estado) return res.status(404).json({ error: 'Informe no encontrado' });
+      const row = estado.row;
+      return res.json({
+        mode: 'actproy',
+        consecutivo: row.consecutivo,
+        cliente: row.nombrecliente || row.cliente,
+        ingeniero: row.ingeniero || '',
+        fecha: row.fecha,
+        ciudad: row.ciudad || '',
+        duracion: row.duracion || '',
+        actividades: row.actividades || '',
+        pendientes: row.pendientes || '',
+        firmado: Boolean(row.firma_cli && String(row.firma_cli).trim()),
+        firma_fecha: row.firma_cli_fecha || null,
+        puedeFirmar: estado.puedeFirmar,
+        bloqueoMotivo: estado.bloqueoMotivo || '',
+      });
+    }
+
     if (payload.scope !== 'firma') {
       return res.status(400).json({ error: 'Enlace de firma inválido' });
     }
@@ -161,6 +183,18 @@ publicFirmaRouter.post('/:token', async (req, res, next) => {
       return res.json({
         ok: true,
         message: 'Firma de aceptación registrada correctamente',
+        firma_fecha: saved.firma_fecha,
+      });
+    }
+
+    if (payload.scope === 'actproy_firma') {
+      if (!validateFirmaDataUrl(firma)) {
+        return res.status(400).json({ error: 'Firma inválida' });
+      }
+      const saved = await saveActproyFirma(payload.consecutivo, firma, nombres);
+      return res.json({
+        ok: true,
+        message: 'Firma del informe registrada correctamente',
         firma_fecha: saved.firma_fecha,
       });
     }

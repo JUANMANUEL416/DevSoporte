@@ -1,0 +1,5 @@
+-- Credenciales y firma digital para técnicos de soporte (SOPORT)
+ALTER TABLE soport ADD COLUMN IF NOT EXISTS usuario VARCHAR(20);
+ALTER TABLE soport ADD COLUMN IF NOT EXISTS clave VARCHAR(255);
+ALTER TABLE soport ADD COLUMN IF NOT EXISTS firma TEXT;
+ALTER TABLE soport ADD COLUMN IF NOT EXISTS firma_fecha TIMESTAMPTZ;

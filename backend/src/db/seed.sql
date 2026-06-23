@@ -37,9 +37,11 @@ ON CONFLICT (codigo) DO NOTHING;
 
 -- Técnicos de soporte
 INSERT INTO soport (codigo, nombre, estado) VALUES
-    ('S01', 'Técnico Uno', 'A'),
-    ('S02', 'Técnico Dos', 'A')
+    ('0001', 'Técnico Uno', 'A'),
+    ('0002', 'Técnico Dos', 'A')
 ON CONFLICT (codigo) DO NOTHING;
+
+UPDATE acns SET consecutivo = GREATEST(consecutivo, 2) WHERE prefijo = 'SOP';
 
 -- Áreas de soporte (bitácora)
 INSERT INTO soparea (codigo, nombre, estado) VALUES
