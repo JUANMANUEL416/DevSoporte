@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { registrarCorreo } from './correoLog.js';
+import { saveSentCopy } from './saveSentCopy.js';
 
 export function isMailConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER);
@@ -48,16 +49,20 @@ export async function sendMail({ to, cc, subject, text, html, attachments, meta 
   }
 
   const transporter = createTransport();
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const mailOptions = {
+    from,
+    to,
+    cc: cc || undefined,
+    subject,
+    text,
+    html,
+    attachments: attachments?.length ? attachments : undefined,
+  };
+
   try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to,
-      cc: cc || undefined,
-      subject,
-      text,
-      html,
-      attachments: attachments?.length ? attachments : undefined,
-    });
+    await transporter.sendMail(mailOptions);
+    await saveSentCopy(mailOptions);
     await logEnvio({ to, cc, subject, text, attachments }, meta, { exito: true, error: null });
     return { sent: true };
   } catch (err) {
