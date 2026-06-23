@@ -1,0 +1,41 @@
+---
+description: Compilar frontend tras cambios de diseño antes de verlos en producción (PM2/ngrok)
+globs: frontend/**/*.{vue,js,scss,css}
+alwaysApply: false
+---
+
+# Frontend en producción — compilar siempre
+
+En **producción**, DevSoporte sirve el SPA **compilado** desde `frontend/dist/spa` (PM2, puerto 3300).  
+`quasar dev` (9020) y ngrok/producción (3300) **no comparten** el mismo bundle.
+
+## Obligatorio tras cambios de UI
+
+Cuando modifiques diseño, estilos, páginas o componentes del frontend:
+
+1. Compilar:
+   ```powershell
+   cd frontend
+   npm run build
+   ```
+2. Reiniciar el servicio:
+   ```powershell
+   pm2 restart devsoporte --update-env
+   ```
+   O ejecutar `Iniciar-DevSoporte.bat` (incluye build + PM2 + ngrok).
+
+## Para el agente
+
+- Al terminar cambios visuales en `frontend/`, **ejecutar build y reiniciar PM2** si el usuario trabaja en producción, o indicarlo explícitamente.
+- No dar por hecho que los cambios ya están en https://…ngrok… hasta recompilar.
+- Si el usuario reporta UI desactualizada, verificar fecha de `frontend/dist/spa/index.html` y volver a compilar.
+
+## Despliegue completo
+
+```powershell
+npm run deploy          # raíz del repo: pull + build + PM2
+```
+
+## Desarrollo local (sin compilar)
+
+Solo para pruebas en caliente: `cd frontend && npx quasar dev` (puerto 9020, proxy a API).

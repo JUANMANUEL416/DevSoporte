@@ -233,6 +233,7 @@ if (isProduction) {
   app.use(express.static(spaDir, { index: false, maxAge: '1d' }));
   app.get(/^(?!\/api).*/, (req, res, next) => {
     if (req.method !== 'GET') return next();
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(spaDir, 'index.html'), (err) => {
       if (err) next(err);
     });

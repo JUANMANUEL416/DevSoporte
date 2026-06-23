@@ -1,7 +1,10 @@
-# Copie a ngrok.yml (o use: ngrok http 9020)
-# Documentacion: https://ngrok.com/docs
-version: '2'
+# Copie a ngrok.yml en la raíz del proyecto (no subir authtoken a Git).
+# Uso: ngrok start devsoporte --config ngrok.yml
+# Producción PM2 escucha en 3300 (API + SPA).
+version: "2"
 tunnels:
-  devsoporte-web:
-    addr: 9020
+  devsoporte:
+    addr: 3300
     proto: http
+    # Descomente si tiene dominio reservado en ngrok:
+    # domain: crested-gently-landowner.ngrok-free.dev

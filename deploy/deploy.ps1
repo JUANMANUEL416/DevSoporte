@@ -19,7 +19,7 @@ function Write-Step($msg) {
   Write-Host "`n==> $msg" -ForegroundColor Cyan
 }
 
-Write-Step "DevSoporte — despliegue producción"
+Write-Step "DevSoporte - despliegue produccion"
 $version = (Get-Content (Join-Path $Root 'VERSION') -Raw).Trim()
 Write-Host "Versión: $version"
 
@@ -44,7 +44,7 @@ if (-not (Test-Path (Join-Path $Root 'frontend\dist\spa\index.html'))) {
 Set-Location $Root
 New-Item -ItemType Directory -Force -Path (Join-Path $Root 'deploy\logs') | Out-Null
 
-Write-Step "PM2 — servicio devsoporte"
+Write-Step "PM2 - servicio devsoporte"
 $pm2 = Get-Command pm2 -ErrorAction SilentlyContinue
 if (-not $pm2) {
   Write-Host "Instalando PM2 globalmente..."
