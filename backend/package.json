@@ -1,6 +1,6 @@
 {
   "name": "devsoporte-backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "API REST para DevSoporte (migración del sistema Clarion a Node + PostgreSQL)",
   "type": "module",
   "main": "src/server.js",
@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "db:init": "node src/db/init.js",
+    "db:clean": "node src/db/clean.js",
     "db:semanas": "node src/db/semanas.js"
   },
   "dependencies": {

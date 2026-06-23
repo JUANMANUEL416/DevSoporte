@@ -93,6 +93,64 @@ Acceso inicial: **usuario** `ADMIN` · **clave** `admin123`.
 
 ---
 
+## Producción (Windows)
+
+Un solo proceso sirve **API + frontend** en el puerto configurado (`PORT`, por defecto 3300).
+
+### 1) Variables de entorno
+
+Copie `deploy/.env.production.example` → `backend/.env` y ajuste PostgreSQL, JWT, SMTP y URLs públicas (`PUBLIC_APP_URL`, `CORS_ORIGIN`).
+
+Con ngrok en producción, apunte el túnel al **mismo puerto** del backend:
+
+```yaml
+# ngrok.yml
+tunnels:
+  devsoporte:
+    addr: 3300
+    proto: http
+```
+
+### 2) Despliegue y servicio PM2
+
+```powershell
+# Desde la raíz del repo
+npm run deploy
+
+# Inicio automático con Windows (PowerShell como Administrador, una sola vez)
+npm run deploy:install
+```
+
+Comandos útiles:
+
+```powershell
+pm2 status
+pm2 restart devsoporte
+pm2 logs devsoporte
+```
+
+Health check: `http://localhost:3300/api/health` (incluye versión).
+
+### 3) Versionado y publicación en GitHub
+
+1. Edite `VERSION` (semver, ej. `1.2.0`) y anote cambios en `CHANGELOG.md`.
+2. Publique:
+
+```powershell
+npm run release
+```
+
+Crea commit (si hay cambios), tag `vX.Y.Z` y push a `origin/main`.
+
+### 4) Limpiar BD (conserva plantilla de correos)
+
+```bash
+cd backend
+npm run db:clean
+```
+
+---
+
 ## Mapa de migración (Clarion → Web)
 
 | Concepto Clarion              | Equivalente en esta solución                          |

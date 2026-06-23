@@ -1,10 +1,14 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import authRoutes from './routes/auth.js';
 import { requireAuth } from './middleware/auth.js';
 import { entities } from './entities.js';
 import { crudRouter } from './crudRouter.js';
+import { query } from './db/pool.js';
+import { getAppVersion } from './version.js';
 import { sendFirmaLinkEmail } from './services/firmaEmail.js';
 import { applyClienteNotificaciones } from './services/clienteNotificaciones.js';
 import {
@@ -151,7 +155,13 @@ app.use(
 app.use(express.json({ limit: '5mb' }));
 
 app.get('/api/health', (req, res) =>
-  res.json({ ok: true, service: 'DevSoporte API', mailConfigured: isMailConfigured() }),
+  res.json({
+    ok: true,
+    service: 'DevSoporte API',
+    version: getAppVersion(),
+    env: process.env.NODE_ENV || 'development',
+    mailConfigured: isMailConfigured(),
+  }),
 );
 
 app.use('/api/public/firma', publicFirmaRouter);
@@ -216,6 +226,19 @@ for (const [key, entity] of Object.entries(entities)) {
   app.use(`/api/${key}`, requireAuth, crudRouter({ ...entity, ...hooks }));
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const spaDir = path.join(__dirname, '../../frontend/dist/spa');
+  app.use(express.static(spaDir, { index: false, maxAge: '1d' }));
+  app.get(/^(?!\/api).*/, (req, res, next) => {
+    if (req.method !== 'GET') return next();
+    res.sendFile(path.join(spaDir, 'index.html'), (err) => {
+      if (err) next(err);
+    });
+  });
+}
+
 // Manejo de errores centralizado.
 app.use((err, req, res, next) => {
   console.error(err);
@@ -224,5 +247,9 @@ app.use((err, req, res, next) => {
 
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {
-  console.log(`DevSoporte API escuchando en http://localhost:${port}`);
+  const mode = isProduction ? 'producción' : 'desarrollo';
+  console.log(`DevSoporte v${getAppVersion()} (${mode}) → http://localhost:${port}`);
+  if (isProduction) {
+    console.log('Frontend SPA servido desde el mismo puerto.');
+  }
 });
