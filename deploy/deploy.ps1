@@ -20,12 +20,17 @@ function Write-Step($msg) {
 }
 
 Write-Step "DevSoporte - despliegue produccion"
+$branch = git rev-parse --abbrev-ref HEAD
+if ($branch -ne 'master') {
+  throw "El despliegue solo se permite desde la rama master (actual: $branch)."
+}
+
 $version = (Get-Content (Join-Path $Root 'VERSION') -Raw).Trim()
-Write-Host "Versión: $version"
+Write-Host "Rama: $branch  Version: $version"
 
 if (-not $SkipPull) {
-  Write-Step "Actualizando código (git pull)"
-  git pull origin main
+  Write-Step "Actualizando codigo (git pull origin master)"
+  git pull origin master
 }
 
 Write-Step "Instalando dependencias backend"

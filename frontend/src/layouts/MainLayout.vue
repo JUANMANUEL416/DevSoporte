@@ -4,7 +4,9 @@
       <q-toolbar>
         <q-btn flat dense round icon="menu" aria-label="Menu" @click="drawer = !drawer" />
         <q-toolbar-title>DevSoporte</q-toolbar-title>
-        <div class="q-mr-md">{{ auth.user?.nombre || auth.user?.usuario }}</div>
+        <q-space />
+        <span class="layout-version q-mr-md">v{{ appVersion }}</span>
+        <div class="q-mr-md layout-user">{{ auth.user?.nombre || auth.user?.usuario }}</div>
         <q-btn flat dense round icon="logout" @click="logout">
           <q-tooltip>Salir</q-tooltip>
         </q-btn>
@@ -85,6 +87,7 @@ import { modulesByGroup } from 'src/config/modules';
 const drawer = ref(true);
 const auth = useAuthStore();
 const router = useRouter();
+const appVersion = process.env.APP_VERSION || '0.0.0';
 const groups = modulesByGroup();
 const expandedGroups = ref(
   Object.fromEntries(Object.keys(groups).map((group) => [group, true])),
@@ -117,6 +120,20 @@ function logout() {
 </script>
 
 <style scoped lang="scss">
+.layout-version {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.layout-user {
+  font-size: 0.9rem;
+}
+
 .sidebar-drawer {
   background: #f8fafc;
   border-right: 1px solid #e2e8f0 !important;

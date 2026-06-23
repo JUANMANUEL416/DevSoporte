@@ -131,16 +131,19 @@ pm2 logs devsoporte
 
 Health check: `http://localhost:3300/api/health` (incluye versión).
 
+**Ramas:** el despliegue solo se ejecuta desde **`master`**. Ver [docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md).
+
 ### 3) Versionado y publicación en GitHub
 
-1. Edite `VERSION` (semver, ej. `1.2.0`) y anote cambios en `CHANGELOG.md`.
-2. Publique:
+1. Merge `develop` → `master`.
+2. Edite `VERSION` (semver, ej. `1.2.0`) y anote cambios en `CHANGELOG.md`.
+3. Desde **`master`**:
 
 ```powershell
 npm run release
 ```
 
-Crea commit (si hay cambios), tag `vX.Y.Z` y push a `origin/main`.
+Crea commit (si hay cambios), tag `vX.Y.Z` y push a `origin/master`.
 
 ### 4) Limpiar BD (conserva plantilla de correos)
 
@@ -151,7 +154,16 @@ npm run db:clean
 
 ---
 
-## Mapa de migración (Clarion → Web)
+## Ramas Git
+
+| Rama | Uso |
+|------|-----|
+| `master` | Producción — compilar y desplegar (`npm run deploy`) |
+| `develop` | Integración — crear aquí las ramas `feature/*` y `fix/*` |
+
+Detalle: [docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md)
+
+---
 
 | Concepto Clarion              | Equivalente en esta solución                          |
 |-------------------------------|-------------------------------------------------------|

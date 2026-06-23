@@ -1,4 +1,10 @@
 import { configure } from 'quasar/wrappers';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const rootDir = dirname(fileURLToPath(import.meta.url));
+const appVersion = readFileSync(join(rootDir, '../VERSION'), 'utf8').trim();
 
 export default configure(() => {
   return {
@@ -10,8 +16,7 @@ export default configure(() => {
       target: { browser: ['es2022', 'edge88', 'firefox78', 'chrome87', 'safari13.1'] },
       vueRouterMode: 'history',
       env: {
-        // Ruta relativa: en dev el proxy de Quasar reenvía /api al backend (3300).
-        // Con ngrok basta un túnel al puerto 9020 para firma remota.
+        APP_VERSION: appVersion,
         API_URL: process.env.API_URL || '/api',
       },
       extendViteConf(viteConf) {

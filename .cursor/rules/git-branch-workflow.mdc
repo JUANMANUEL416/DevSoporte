@@ -1,0 +1,50 @@
+---
+description: Flujo Git DevSoporte — master publica, develop integra, cambios solo en ramas feature/fix
+alwaysApply: true
+---
+
+# Ramas Git — DevSoporte
+
+## Ramas fijas
+
+| Rama | Uso |
+|------|-----|
+| `master` | **Producción.** Solo recibe merges probados. Aquí se compila y despliega (`npm run deploy`, PM2). |
+| `develop` | **Integración.** Base para todo desarrollo. No desplegar directamente a producción. |
+
+## Reglas obligatorias
+
+1. **No commitear en `master` ni `develop`** salvo merges integrados y releases versionados.
+2. **Todo cambio de código** se hace en ramas derivadas de `develop`:
+   - `feature/nombre-corto` — funcionalidad nueva
+   - `fix/nombre-corto` — corrección
+3. Flujo: `develop` → crear rama → commits → merge a `develop` → probar → merge `develop` → `master` → `npm run deploy`.
+4. **`npm run deploy` y `npm run release` solo desde `master`.**
+5. Tras cambios en `frontend/`, compilar antes de desplegar (`npm run build` incluido en deploy).
+
+## Comandos habituales
+
+```powershell
+git checkout develop
+git pull origin develop
+git checkout -b feature/mi-cambio
+
+# al terminar:
+git checkout develop
+git merge feature/mi-cambio
+git push origin develop
+
+# publicar:
+git checkout master
+git pull origin master
+git merge develop
+git push origin master
+npm run deploy
+```
+
+## Para el agente
+
+- Antes de editar código, verificar rama actual (`git branch --show-current`).
+- Si está en `master` o `develop`, crear o cambiar a una rama `feature/*` o `fix/*` desde `develop` antes de implementar.
+- No ejecutar deploy/release fuera de `master`.
+- Avisar al usuario si pide desplegar desde otra rama.

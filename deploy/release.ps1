@@ -13,6 +13,11 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
+$branch = git rev-parse --abbrev-ref HEAD
+if ($branch -ne 'master') {
+  throw "El release solo se permite desde la rama master (actual: $branch)."
+}
+
 $version = (Get-Content (Join-Path $Root 'VERSION') -Raw).Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+$') {
   throw "VERSION inválida: $version (use semver, ej. 1.1.0)"
@@ -35,7 +40,7 @@ if ($existing) {
   git tag -a $tag -m "DevSoporte $tag"
 }
 
-git push origin main
+git push origin master
 git push origin $tag
 
 Write-Host "`nPublicado: $tag" -ForegroundColor Green
