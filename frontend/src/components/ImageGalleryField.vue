@@ -29,22 +29,29 @@
       Sin imágenes. Puede adjuntar capturas o fotos del trabajo realizado (máx. {{ maxCount }}, 1 MB c/u).
     </div>
 
-    <div v-else class="image-gallery-field__grid">
-      <figure v-for="(item, index) in items" :key="index" class="image-gallery-field__item">
+    <div v-else class="image-gallery-field__list">
+      <article
+        v-for="(item, index) in items"
+        :key="`${item.nombre}-${index}`"
+        class="image-gallery-field__row"
+      >
         <img :src="item.data" :alt="item.nombre" class="image-gallery-field__thumb" />
-        <figcaption class="image-gallery-field__caption">{{ item.nombre }}</figcaption>
+        <div class="image-gallery-field__meta">
+          <div class="image-gallery-field__name">{{ item.nombre }}</div>
+          <div class="image-gallery-field__size">{{ formatSize(item.data) }}</div>
+        </div>
         <q-btn
           flat
           dense
-          round
-          size="sm"
+          no-caps
           color="negative"
-          icon="close"
-          class="image-gallery-field__remove"
+          icon="delete_outline"
+          label="Quitar"
+          class="image-gallery-field__remove-btn"
           :disable="disabled"
           @click="removeAt(index)"
         />
-      </figure>
+      </article>
     </div>
   </div>
 </template>
@@ -99,6 +106,14 @@ function pickFiles() {
 function removeAt(index) {
   items.value = items.value.filter((_, i) => i !== index);
   emitValue();
+}
+
+function formatSize(dataUrl) {
+  const m = String(dataUrl || '').match(/^data:[^;]+;base64,(.+)$/);
+  if (!m) return '';
+  const bytes = Math.ceil((m[1].length * 3) / 4);
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
 function readFile(file) {
@@ -185,41 +200,52 @@ async function onFilesSelected(event) {
   padding: 8px 0;
 }
 
-.image-gallery-field__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
+.image-gallery-field__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.image-gallery-field__item {
-  position: relative;
-  margin: 0;
+.image-gallery-field__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  overflow: hidden;
   background: #f8fafc;
 }
 
 .image-gallery-field__thumb {
   display: block;
-  width: 100%;
-  height: 110px;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
 }
 
-.image-gallery-field__caption {
-  padding: 6px 8px;
-  font-size: 11px;
-  color: #475569;
+.image-gallery-field__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.image-gallery-field__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.image-gallery-field__remove {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: rgba(255, 255, 255, 0.92);
+.image-gallery-field__size {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.image-gallery-field__remove-btn {
+  flex-shrink: 0;
 }
 </style>

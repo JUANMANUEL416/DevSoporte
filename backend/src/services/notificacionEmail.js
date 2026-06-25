@@ -17,6 +17,8 @@ import {
   loadFuncionarioDestinatario,
   hasFirmaAceptacion,
 } from './bitacoraFirma.js';
+import { formatNombreConTratamiento } from './saludo.js';
+import { buildImagenesEmailPayload, parseImagenesSoporte } from './bitacoraImagenes.js';
 import {
   applyNombreTemplate,
   extractIntroFromBody,
@@ -24,8 +26,6 @@ import {
   buildNotificationEmailHtml,
   buildPlainNotificationEmail,
 } from './emailTemplate.js';
-import { formatNombreConTratamiento } from './saludo.js';
-import { buildImagenesEmailPayload } from './bitacoraImagenes.js';
 
 async function loadCliente(codigo) {
   if (!codigo) return null;
@@ -350,10 +350,12 @@ export async function previewNotificacionBitacora(cnssoporte) {
           email: funcionario.email,
           documento: funcionario.documento,
           tratamiento: funcionario.tratamiento || '',
+          displayName: formatNombreConTratamiento(funcionario.tratamiento, funcionario.nombre),
         }
       : null,
     firmaUrl,
     imagenesCount: imagenesPayload.gallery.length,
+    imagenes: parseImagenesSoporte(bita.imagenes_soporte).map(({ nombre, data }) => ({ nombre, data })),
   };
 }
 
@@ -476,10 +478,10 @@ export async function enviarNotificacionBitacora(cnssoporte, body = {}, usuario 
     ccList,
     subject,
     buildMessage: () => bundle.buildForRecipient({
-      nombre: toList[0]?.nombre || funcionario?.nombre || 'estimado(a)',
-      tratamiento: toList[0]?.tratamiento || funcionario?.tratamiento || '',
-      displayName: toList[0]?.displayName
-        || formatNombreConTratamiento(funcionario?.tratamiento, funcionario?.nombre)
+      nombre: funcionario?.nombre || toList[0]?.nombre || 'estimado(a)',
+      tratamiento: funcionario?.tratamiento || toList[0]?.tratamiento || '',
+      displayName: formatNombreConTratamiento(funcionario?.tratamiento, funcionario?.nombre)
+        || toList[0]?.displayName
         || toList[0]?.nombre
         || 'estimado(a)',
     }),
