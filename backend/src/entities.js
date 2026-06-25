@@ -138,7 +138,10 @@ export const entities = {
     },
     filterColumns: ['cnsbite', 'cliente', 'estado'],
     listFrom: 'bita b LEFT JOIN clie c ON c.codigo = b.cliente',
-    listSelect: 'b.cnssoporte, b.fecha, b.cliente, b.soporte, b.funcionario, b.clase, b.solicitud, b.respuesta, b.estado, b.fechar, b.observaciones, b.medio, b.cnsbite, b.firma_fecha, c.nombrecliente',
+    listSelect:
+      'b.cnssoporte, b.fecha, b.cliente, b.soporte, b.funcionario, b.clase, b.solicitud, b.respuesta, b.estado, b.fechar, b.observaciones, b.medio, b.cnsbite, b.firma_fecha, c.nombrecliente, '
+      + '(CASE WHEN COALESCE(TRIM(b.imagenes_soporte), \'\') NOT IN (\'\', \'[]\') '
+      + 'THEN jsonb_array_length(b.imagenes_soporte::jsonb) ELSE 0 END) AS imagenes_count',
     listSearch: ['b.cnssoporte', 'b.cliente', 'b.funcionario', 'b.solicitud', 'c.nombrecliente'],
     tableAlias: 'b',
   },

@@ -9,8 +9,24 @@ export function readVersionFile() {
   return readFileSync(join(rootDir, 'VERSION'), 'utf8').trim();
 }
 
+function syncPackageJsonVersion(version) {
+  for (const rel of ['package.json', 'backend/package.json', 'frontend/package.json']) {
+    const path = join(rootDir, rel);
+    try {
+      const pkg = JSON.parse(readFileSync(path, 'utf8'));
+      if (pkg.version !== version) {
+        pkg.version = version;
+        writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+      }
+    } catch {
+      // omitir si no existe
+    }
+  }
+}
+
 export function writeVersionFile(version) {
   writeFileSync(join(rootDir, 'VERSION'), `${version}\n`, 'utf8');
+  syncPackageJsonVersion(version);
 }
 
 export async function listIntegrados(consecutivos = null) {

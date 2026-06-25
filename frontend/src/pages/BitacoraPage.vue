@@ -348,6 +348,13 @@
                               :disable="!puedeEditarEvidencias(item, props.row.cnsbite)"
                               @click="openBitEvidencias(item)"
                             >
+                              <q-badge
+                                v-if="imagenesCount(item) > 0"
+                                color="deep-orange-8"
+                                text-color="white"
+                                floating
+                                :label="String(imagenesCount(item))"
+                              />
                               <q-tooltip>
                                 {{ evidenciasTooltip(item, props.row.cnsbite) }}
                               </q-tooltip>
@@ -488,12 +495,17 @@
           <q-space />
           <q-btn flat dense round icon="close" v-close-popup />
         </q-card-section>
-        <q-card-section class="q-pt-none">
+        <q-card-section class="q-pt-none relative-position">
           <p class="bit-cerrar-dialog__hint">
             Estas imágenes se guardan con el soporte y se incluyen automáticamente al enviar el correo (no van en el editor del correo).
           </p>
+          <p v-if="!evidenciasLoading" class="bit-cerrar-dialog__hint q-mb-sm">
+            Pulse <strong>Agregar</strong>, elija las fotos y luego <strong>Guardar evidencias</strong>. Hasta guardar, no quedan registradas.
+          </p>
+          <q-inner-loading :showing="evidenciasLoading" label="Cargando imágenes..." />
           <ImageGalleryField
-            v-if="evidenciasOpen"
+            v-if="evidenciasOpen && !evidenciasLoading"
+            :key="evidenciasRow?.cnssoporte"
             v-model="evidenciasImagenes"
             label="Imágenes de soporte"
             hint="Capturas o fotos del trabajo realizado (máx. 5, 1 MB c/u)."
@@ -687,6 +699,7 @@ const sendingNotifyId = ref('');
 const evidenciasOpen = ref(false);
 const evidenciasRow = ref(null);
 const evidenciasImagenes = ref('');
+const evidenciasLoading = ref(false);
 const evidenciasSaving = ref(false);
 const sendingReporteKey = ref('');
 
@@ -766,10 +779,18 @@ function puedeEditarEvidencias(item, cnsbite) {
   return true;
 }
 
+function imagenesCount(item) {
+  const n = Number(item?.imagenes_count);
+  if (Number.isFinite(n) && n > 0) return n;
+  return soporteImagenes(item).length;
+}
+
 function evidenciasTooltip(item, cnsbite) {
   if (hasFirmaAceptacion(item)) return 'Ya firmado; no se pueden cambiar las imágenes';
   if (isSoporteBloqueado(item, cnsbite)) return soporteBloqueoMensaje(item, cnsbite);
-  return 'Imágenes de soporte (van en el correo al enviar)';
+  const n = imagenesCount(item);
+  if (n > 0) return `${n} imagen${n === 1 ? '' : 'es'} guardada${n === 1 ? '' : 's'} — clic para ver o editar`;
+  return 'Sin imágenes — agregar evidencias del trabajo (van en el correo al enviar)';
 }
 
 function puedeEditarSoporte(item, cnsbite) {
@@ -1124,12 +1145,14 @@ async function openBitEdit(row) {
 }
 
 async function openBitEvidencias(row) {
-  if (!puedeEditarEvidencias(row, row.cnsbite || expandedCnsbite.value)) {
-    $q.notify({ type: 'warning', message: evidenciasTooltip(row, row.cnsbite || expandedCnsbite.value) });
+  const cnsbite = row.cnsbite || expandedCnsbite.value;
+  if (!puedeEditarEvidencias(row, cnsbite)) {
+    $q.notify({ type: 'warning', message: evidenciasTooltip(row, cnsbite) });
     return;
   }
   evidenciasRow.value = row;
   evidenciasImagenes.value = '';
+  evidenciasLoading.value = true;
   evidenciasOpen.value = true;
   try {
     const full = await bitApi.get(row.cnssoporte);
@@ -1137,6 +1160,8 @@ async function openBitEvidencias(row) {
     evidenciasRow.value = { ...row, ...full };
   } catch {
     evidenciasImagenes.value = row.imagenes_soporte || '';
+  } finally {
+    evidenciasLoading.value = false;
   }
 }
 

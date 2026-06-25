@@ -1,5 +1,7 @@
 const MAX_IMAGENES = 5;
 const MAX_BYTES = 1024 * 1024;
+const THUMB_MAX_WIDTH = 220;
+const THUMB_MAX_HEIGHT = 165;
 
 export function parseImagenesSoporte(raw) {
   if (!raw) return [];
@@ -58,26 +60,50 @@ export function normalizeImagenesSoporte(raw) {
   return JSON.stringify(normalized);
 }
 
-export function buildImagenesEmailPayload(raw) {
+async function createEmailThumbnail(buffer) {
+  try {
+    const sharp = (await import('sharp')).default;
+    return await sharp(buffer)
+      .rotate()
+      .resize(THUMB_MAX_WIDTH, THUMB_MAX_HEIGHT, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82, mozjpeg: true })
+      .toBuffer();
+  } catch {
+    return buffer;
+  }
+}
+
+export async function buildImagenesEmailPayload(raw) {
   const list = parseImagenesSoporte(raw);
   if (!list.length) return { attachments: [], gallery: [] };
 
   const attachments = [];
   const gallery = [];
 
-  list.forEach((item, index) => {
+  for (let index = 0; index < list.length; index += 1) {
+    const item = list[index];
     const decoded = dataUrlToBuffer(item.data);
-    if (!decoded) return;
-    const cid = `soporte-img-${index + 1}`;
+    if (!decoded) continue;
+
+    const cid = `soporte-thumb-${index + 1}`;
     const filename = String(item.nombre || `soporte-${index + 1}.png`).slice(0, 120);
+    const thumbBuffer = await createEmailThumbnail(decoded.buffer);
+
+    attachments.push({
+      filename: `miniatura-${filename.replace(/\.[^.]+$/, '')}.jpg`,
+      content: thumbBuffer,
+      contentType: 'image/jpeg',
+      cid,
+      contentDisposition: 'inline',
+    });
     attachments.push({
       filename,
       content: decoded.buffer,
       contentType: decoded.tipo,
-      cid,
+      contentDisposition: 'attachment',
     });
-    gallery.push({ cid, alt: filename });
-  });
+    gallery.push({ cid, alt: filename, filename });
+  }
 
   return { attachments, gallery };
 }

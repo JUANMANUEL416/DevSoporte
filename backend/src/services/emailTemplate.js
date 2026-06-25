@@ -95,11 +95,22 @@ function renderImageGallery(images = []) {
   if (!images.length) return '';
   const cells = images
     .map(
-      ({ cid, alt }) => `
-        <td style="padding:8px 0 16px;vertical-align:top;">
-          <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#64748b;">${escapeHtml(alt || 'Evidencia')}</p>
-          <img src="cid:${escapeHtml(cid)}" alt="${escapeHtml(alt || 'Evidencia de soporte')}"
-               style="display:block;max-width:100%;width:520px;height:auto;border:1px solid #e2e8f0;border-radius:8px;" />
+      ({ cid, alt, filename }) => `
+        <td width="50%" style="padding:6px 8px 10px;vertical-align:top;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td align="center" style="padding:8px;background:#f1f5f9;">
+                <img src="cid:${escapeHtml(cid)}" alt="${escapeHtml(alt || 'Evidencia de soporte')}"
+                     width="200" style="display:block;max-width:200px;width:100%;height:auto;border-radius:4px;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;">
+                <p style="margin:0;font-size:11px;font-weight:600;color:#475569;word-break:break-all;">${escapeHtml(filename || alt || 'Evidencia')}</p>
+                <p style="margin:4px 0 0;font-size:10px;line-height:1.4;color:#94a3b8;">Vista previa — tamaño completo en adjuntos</p>
+              </td>
+            </tr>
+          </table>
         </td>`,
     )
     .join('');
@@ -107,7 +118,8 @@ function renderImageGallery(images = []) {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0 0;">
       <tr>
         <td style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
-          <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0f172a;">Evidencias del soporte</p>
+          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#0f172a;">Evidencias del soporte</p>
+          <p style="margin:0 0 12px;font-size:12px;line-height:1.45;color:#64748b;">Miniaturas en este mensaje. Las imágenes completas van adjuntas al correo.</p>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
             <tr>${cells}</tr>
           </table>

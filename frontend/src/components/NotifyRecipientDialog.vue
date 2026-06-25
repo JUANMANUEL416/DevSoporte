@@ -222,8 +222,53 @@
               bg-color="white"
               autogrow
               class="notify-dialog__body-input q-mb-sm"
-              hint="{{nombre}} = saludo personalizado · Los datos del registro se incluyen en el diseño del correo"
+              hint="{{nombre}} = saludo personalizado (incluye tratamiento Doctor/Sra.) · Los datos del registro se incluyen en el diseño del correo"
             />
+
+            <q-banner
+              v-if="isBitacoraMode && funcionarioSolicitante && !funcionarioSolicitante.tratamiento"
+              dense
+              rounded
+              class="notify-dialog__info notify-dialog__info--bitacora q-mb-sm"
+            >
+              El funcionario no tiene <strong>Tratamiento</strong> (Doctor, Doctora, Sra., etc.).
+              Configúrelo en Clientes → Funcionarios para personalizar el saludo.
+            </q-banner>
+
+            <section v-if="isBitacoraMode && imagenesSoporte.length" class="notify-dialog__section q-mb-sm">
+              <div class="notify-dialog__section-head">
+                <span class="notify-dialog__section-title">
+                  <q-icon name="photo_library" size="15px" class="q-mr-xs" />
+                  Imágenes de soporte ({{ imagenesSoporte.length }})
+                </span>
+              </div>
+              <p class="notify-dialog__images-hint">
+                Miniaturas en el cuerpo del correo; las imágenes completas van adjuntas. Puede quitar alguna antes de enviar.
+              </p>
+              <div class="notify-dialog__images-list">
+                <article
+                  v-for="(img, index) in imagenesSoporte"
+                  :key="`${img.nombre}-${index}`"
+                  class="notify-dialog__image-row"
+                >
+                  <img :src="img.data" :alt="img.nombre" class="notify-dialog__image-thumb" />
+                  <div class="notify-dialog__image-meta">
+                    <div class="notify-dialog__image-name">{{ img.nombre }}</div>
+                  </div>
+                  <q-btn
+                    flat
+                    dense
+                    no-caps
+                    color="negative"
+                    icon="delete_outline"
+                    label="Quitar"
+                    :loading="removingImagenIndex === index"
+                    @click="removeImagenSoporte(index)"
+                  />
+                </article>
+              </div>
+            </section>
+
             <div class="notify-dialog__preview-label">Vista previa</div>
             <pre class="notify-dialog__preview">{{ previewSample }}</pre>
           </section>
@@ -251,7 +296,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import { clientesApi, notificacionApi, bitacoraApi, actproyApi } from 'src/services/api';
+import { clientesApi, notificacionApi, bitacoraApi, actproyApi, useResource } from 'src/services/api';
+import { formatNombreConTratamiento } from 'src/utils/saludo';
 
 const emit = defineEmits(['update:modelValue', 'send']);
 
@@ -286,6 +332,10 @@ const manualRol = ref('to');
 const draggingEmail = ref('');
 const dragOverZone = ref('');
 const dragPayload = ref(null);
+const funcionarioSolicitante = ref(null);
+const imagenesSoporte = ref([]);
+const removingImagenIndex = ref(-1);
+const bitApi = useResource('bitacora');
 
 const manualRolOptions = [
   { label: 'Para (cliente)', value: 'to' },
@@ -354,7 +404,7 @@ const previewSample = computed(() => {
       .filter((c) => selectedCc.value.includes(c.email))
       .map((c) => c.email)
       .join(', ') || '(ninguno)';
-    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Enlace compartido: al abrirlo se pide documento; solo el funcionario solicitante puede firmar.)`;
+    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}${imagenesPreviewNote.value}\n\n(Enlace compartido: al abrirlo se pide documento; solo el funcionario solicitante puede firmar.)`;
   }
   if (isSemanaReportMode.value) {
     const para = allContactosTo.value
@@ -369,12 +419,24 @@ const previewSample = computed(() => {
 });
 
 const previewNombre = computed(() => {
+  if (isBitacoraMode.value && funcionarioSolicitante.value) {
+    return funcionarioSolicitante.value.displayName
+      || formatNombreConTratamiento(
+        funcionarioSolicitante.value.tratamiento,
+        funcionarioSolicitante.value.nombre,
+      );
+  }
   if (isSplitRecipientsMode.value) {
     const first = allContactosTo.value.find((c) => selectedTo.value.includes(c.email));
     return first?.nombre || clienteNombre.value || 'estimado(a)';
   }
   const first = allContactos.value.find((c) => selected.value.includes(c.email));
   return first?.nombre || 'estimado(a)';
+});
+
+const imagenesPreviewNote = computed(() => {
+  if (!isBitacoraMode.value || !imagenesSoporte.value.length) return '';
+  return `\n\n(Evidencias: ${imagenesSoporte.value.length} miniatura(s) en el cuerpo + adjuntos en tamaño completo)`;
 });
 
 watch(
@@ -390,6 +452,9 @@ watch(
     manualContactosCc.value = [];
     manualEmail.value = '';
     manualRol.value = 'to';
+    funcionarioSolicitante.value = null;
+    imagenesSoporte.value = [];
+    removingImagenIndex.value = -1;
     try {
       let preview;
       if (isSemanaReportMode.value) {
@@ -476,16 +541,20 @@ watch(
         selectedTo.value = contactosTo.value.map((c) => c.email);
         selectedCc.value = contactosCc.value.map((c) => c.email);
       } else if (isBitacoraMode.value) {
+        funcionarioSolicitante.value = preview.funcionario || null;
+        imagenesSoporte.value = Array.isArray(preview.imagenes) ? [...preview.imagenes] : [];
         const paraMap = new Map();
         const addPara = (c, cargo) => {
           const email = String(c?.email || '').trim();
           if (!email) return;
           const key = email.toLowerCase();
           if (paraMap.has(key)) return;
+          const nombreDisplay = c.displayName
+            || formatNombreConTratamiento(c.tratamiento, c.nombre || email);
           paraMap.set(key, {
             id: `para-${key}`,
             email,
-            nombre: c.nombre || email,
+            nombre: nombreDisplay,
             cargo: cargo || c.cargo || '',
           });
         };
@@ -631,6 +700,26 @@ function onDrop(toZone, event) {
 function restorePreview() {
   subject.value = defaultSubject.value;
   bodyText.value = defaultBody.value;
+}
+
+async function removeImagenSoporte(index) {
+  if (!props.recordId || index < 0 || index >= imagenesSoporte.value.length) return;
+  removingImagenIndex.value = index;
+  try {
+    const next = imagenesSoporte.value.filter((_, i) => i !== index);
+    await bitApi.update(props.recordId, {
+      imagenes_soporte: next.length ? JSON.stringify(next) : '',
+    });
+    imagenesSoporte.value = next;
+    $q.notify({ type: 'positive', message: 'Imagen quitada del soporte' });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudo quitar la imagen',
+    });
+  } finally {
+    removingImagenIndex.value = -1;
+  }
 }
 
 function addManualEmail() {
@@ -982,6 +1071,50 @@ function confirmSend() {
   white-space: pre-wrap;
   word-break: break-word;
   overflow: auto;
+}
+
+.notify-dialog__images-hint {
+  margin: 0 0 8px;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.notify-dialog__images-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notify-dialog__image-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.notify-dialog__image-thumb {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.notify-dialog__image-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.notify-dialog__image-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .notify-dialog__actions {
