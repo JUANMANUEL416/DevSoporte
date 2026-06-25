@@ -118,6 +118,14 @@
                 bg-color="white"
                 :hint="passwordHint(f)"
               />
+              <ImageGalleryField
+                v-else-if="f.type === 'images'"
+                v-model="form[f.name]"
+                :label="f.label"
+                :hint="f.hint || ''"
+                :disabled="isFieldDisabled(f)"
+                class="generic-form__field"
+              />
               <div v-else-if="f.type === 'signature'" class="generic-form__signature">
                 <div class="generic-form__signature-label">{{ f.label }}</div>
                 <SignaturePad
@@ -172,6 +180,7 @@ import { useResource } from 'src/services/api';
 import LookupSelect from 'components/LookupSelect.vue';
 import ContactosDialogField from 'components/ContactosDialogField.vue';
 import SignaturePad from 'components/SignaturePad.vue';
+import ImageGalleryField from 'components/ImageGalleryField.vue';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -313,7 +322,7 @@ function onSignatureSave(field, dataUrl) {
 }
 
 function fieldColClass(f) {
-  if (f.type === 'textarea' || f.type === 'signature' || f.type === 'contactosDialog') {
+  if (f.type === 'textarea' || f.type === 'signature' || f.type === 'images' || f.type === 'contactosDialog') {
     return f.type === 'contactosDialog' ? 'col-12 col-md-6' : 'col-12';
   }
   const cols = props.module.formCols || 1;

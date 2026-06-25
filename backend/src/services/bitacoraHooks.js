@@ -7,6 +7,7 @@ import {
 import { ensureBiteClie, getBiteClie, isSemanaClienteCerrada } from './bitacoraSemanaClienteEstado.js';
 import { hasFirmaAceptacion } from './bitacoraFirma.js';
 import { query } from '../db/pool.js';
+import { normalizeImagenesSoporte } from './bitacoraImagenes.js';
 
 async function loadBitaGuard(cnssoporte) {
   const res = await query(
@@ -52,6 +53,9 @@ export async function beforeBitacoraCreate(body) {
   body.estado = 'Proceso';
   if (!body.clase) body.clase = 'Soporte';
   if (!body.medio) body.medio = 'Remoto';
+  if (body.imagenes_soporte !== undefined) {
+    body.imagenes_soporte = normalizeImagenesSoporte(body.imagenes_soporte);
+  }
 
   if (!body.cnsbite) return;
 
@@ -82,6 +86,10 @@ export async function beforeBitacoraUpdate(body, ids) {
   delete body.fechar;
   delete body.firma;
   delete body.firma_fecha;
+
+  if (body.imagenes_soporte !== undefined) {
+    body.imagenes_soporte = normalizeImagenesSoporte(body.imagenes_soporte);
+  }
 
   const existing = await assertBitaModificable(ids[0]);
   if (!existing) return;

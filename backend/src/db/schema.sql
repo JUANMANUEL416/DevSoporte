@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS clief (
     cargo      VARCHAR(20),
     estado     VARCHAR(10),
     email      VARCHAR(120),
+    tratamiento VARCHAR(20),
     PRIMARY KEY (codigo, documento)
 );
 CREATE INDEX IF NOT EXISTS clief_codigo ON clief (codigo);
@@ -189,7 +190,8 @@ CREATE TABLE IF NOT EXISTS bita (
     medio         VARCHAR(10),
     cnsbite       VARCHAR(20),
     firma         TEXT,
-    firma_fecha   TIMESTAMPTZ
+    firma_fecha   TIMESTAMPTZ,
+    imagenes_soporte TEXT
 );
 CREATE INDEX IF NOT EXISTS bita_cliente ON bita (cliente, cnssoporte);
 CREATE INDEX IF NOT EXISTS bita_cnsbite ON bita (cnsbite, cnssoporte);

@@ -9,7 +9,7 @@ export function hasFirmaAceptacion(bita) {
 export async function loadFuncionarioDestinatario(bita) {
   if (!bita?.cliente || !bita?.funcionario) return null;
   const res = await query(
-    `SELECT nombre, email, documento, cargo
+    `SELECT nombre, email, documento, cargo, tratamiento
      FROM clief
      WHERE codigo = $1
        AND LOWER(TRIM(nombre)) = LOWER(TRIM($2))

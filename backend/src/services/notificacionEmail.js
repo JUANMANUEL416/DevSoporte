@@ -24,6 +24,8 @@ import {
   buildNotificationEmailHtml,
   buildPlainNotificationEmail,
 } from './emailTemplate.js';
+import { formatNombreConTratamiento } from './saludo.js';
+import { buildImagenesEmailPayload } from './bitacoraImagenes.js';
 
 async function loadCliente(codigo) {
   if (!codigo) return null;
@@ -91,7 +93,7 @@ function buildCapacitacionEmailBundle(cap, cliente, bodyTemplate, { pdfFilename 
   };
 }
 
-function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, incluyeFirma = Boolean(firmaUrl) } = {}) {
+function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, incluyeFirma = Boolean(firmaUrl), imagenesPayload = null } = {}) {
   const defaults = buildBitacoraNotificacionContent(bita, cliente, { incluyeFirma });
   const sourceBody = String(bodyTemplate || '').trim() || defaults.body;
   const introTemplate = extractIntroFromBody(sourceBody, defaults.body);
@@ -111,12 +113,16 @@ function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, inclu
   const actionButton = firmaUrl
     ? { href: firmaUrl, label: 'Firma aceptación de la solución' }
     : null;
+  const imageGallery = imagenesPayload?.gallery?.length ? imagenesPayload.gallery : [];
 
   return {
     subject: defaults.subject,
     body: introForPreview,
     buildForRecipient(destinatario) {
-      const saludo = destinatario?.nombre || 'estimado(a)';
+      const saludo = destinatario?.displayName
+        || formatNombreConTratamiento(destinatario?.tratamiento, destinatario?.nombre)
+        || destinatario?.nombre
+        || 'estimado(a)';
       const introText = stripLeadingGreeting(applyNombreTemplate(introTemplate, saludo));
       const greeting = `Hola ${saludo},`;
       const html = buildNotificationEmailHtml({
@@ -131,8 +137,11 @@ function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, inclu
         calloutTitle: firmaUrl ? 'Aceptación de la solución' : 'Información',
         calloutText: firmaUrl
           ? 'Al abrir el enlace ingrese su documento. Solo el funcionario que solicitó el soporte verá el espacio para firmar.'
-          : 'Este correo resume el registro de soporte atendido por nuestro equipo.',
+          : imageGallery.length
+            ? 'Este correo incluye imágenes de soporte del trabajo realizado (adjuntas y en el cuerpo del mensaje).'
+            : 'Este correo resume el registro de soporte atendido por nuestro equipo.',
         actionButton,
+        imageGallery,
         footerNote: firmaUrl
           ? 'Todos los destinatarios reciben el enlace; la firma solo está disponible tras validar el documento del solicitante.'
           : 'Copia informativa del registro de soporte.',
@@ -184,11 +193,17 @@ function resolveEquipoDestinatarios(cliente, emailList) {
 
 function resolveFuncionarioDestinatarios(funcionario, emailList) {
   if (!emailList.length) return [];
+  const displayName = formatNombreConTratamiento(funcionario?.tratamiento, funcionario?.nombre);
   return emailList.map((email) => {
     if (funcionario?.email && email.toLowerCase() === funcionario.email.toLowerCase()) {
-      return { email: funcionario.email, nombre: funcionario.nombre || funcionario.email };
+      return {
+        email: funcionario.email,
+        nombre: funcionario.nombre || funcionario.email,
+        tratamiento: funcionario.tratamiento || '',
+        displayName: displayName || funcionario.nombre || funcionario.email,
+      };
     }
-    return { email, nombre: '' };
+    return { email, nombre: '', tratamiento: '', displayName: '' };
   });
 }
 
@@ -320,14 +335,25 @@ export async function previewNotificacionBitacora(cnssoporte) {
   const cliente = bita.cliente ? await loadCliente(bita.cliente) : null;
   const funcionario = await loadFuncionarioDestinatario(bita);
   const firmaUrl = createBitacoraFirmaLink(cnssoporte);
-  const bundle = buildBitacoraEmailBundle(bita, cliente, '', { firmaUrl, incluyeFirma: true });
+  const imagenesPayload = buildImagenesEmailPayload(bita.imagenes_soporte);
+  const bundle = buildBitacoraEmailBundle(bita, cliente, '', {
+    firmaUrl,
+    incluyeFirma: true,
+    imagenesPayload,
+  });
   return {
     subject: bundle.subject,
     body: bundle.body,
     funcionario: funcionario
-      ? { nombre: funcionario.nombre, email: funcionario.email, documento: funcionario.documento }
+      ? {
+          nombre: funcionario.nombre,
+          email: funcionario.email,
+          documento: funcionario.documento,
+          tratamiento: funcionario.tratamiento || '',
+        }
       : null,
     firmaUrl,
+    imagenesCount: imagenesPayload.gallery.length,
   };
 }
 
@@ -430,9 +456,20 @@ export async function enviarNotificacionBitacora(cnssoporte, body = {}, usuario 
   const toList = resolveFuncionarioDestinatarios(funcionario, toEmails);
   const ccList = resolveEquipoDestinatarios(cliente, ccEmails);
   const firmaUrl = createBitacoraFirmaLink(cnssoporte);
+  const imagenesPayload = buildImagenesEmailPayload(bita.imagenes_soporte);
   const bodyTemplate = String(body.body || '').trim();
-  const bundle = buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, incluyeFirma: true });
+  const bundle = buildBitacoraEmailBundle(bita, cliente, bodyTemplate, {
+    firmaUrl,
+    incluyeFirma: true,
+    imagenesPayload,
+  });
   const subject = String(body.subject || '').trim() || bundle.subject;
+  const imageAttachments = imagenesPayload.attachments.map((a) => ({
+    filename: a.filename,
+    content: a.content,
+    contentType: a.contentType,
+    cid: a.cid,
+  }));
 
   return sendActaCapacitacionEmail({
     toList,
@@ -440,8 +477,13 @@ export async function enviarNotificacionBitacora(cnssoporte, body = {}, usuario 
     subject,
     buildMessage: () => bundle.buildForRecipient({
       nombre: toList[0]?.nombre || funcionario?.nombre || 'estimado(a)',
+      tratamiento: toList[0]?.tratamiento || funcionario?.tratamiento || '',
+      displayName: toList[0]?.displayName
+        || formatNombreConTratamiento(funcionario?.tratamiento, funcionario?.nombre)
+        || toList[0]?.nombre
+        || 'estimado(a)',
     }),
-    attachments: [],
+    attachments: imageAttachments,
     meta: {
       cliente: bita.cliente,
       nombrecliente: cliente?.nombrecliente || null,

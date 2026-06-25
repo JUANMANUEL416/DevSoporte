@@ -83,6 +83,7 @@ export const modules = [
       columns: [
         { name: 'documento', label: 'Documento', field: 'documento', align: 'left', sortable: true },
         { name: 'nombre', label: 'Nombre funcionario', field: 'nombre', align: 'left' },
+        { name: 'tratamiento', label: 'Tratamiento', field: 'tratamiento', align: 'left' },
         { name: 'email', label: 'Email', field: 'email', align: 'left' },
         { name: 'cargo', label: 'Cargo', field: 'cargo', align: 'left' },
         { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
@@ -90,6 +91,13 @@ export const modules = [
       fields: [
         { name: 'documento', label: 'Documento', type: 'text', required: true },
         { name: 'nombre', label: 'Nombre funcionario', type: 'text' },
+        {
+          name: 'tratamiento',
+          label: 'Tratamiento',
+          type: 'select',
+          options: ['Doctor', 'Doctora', 'Sr.', 'Sra.', 'Srta.'],
+          hint: 'Se usa en el saludo del correo de bitácora (ej. Doctor Juan Pérez).',
+        },
         { name: 'email', label: 'Email', type: 'email' },
         { name: 'cargo', label: 'Cargo', type: 'text' },
         { name: 'estado', label: 'Estado', type: 'select', options: ['Activo', 'Inactivo'], default: 'Activo' },
@@ -452,6 +460,13 @@ export const modules = [
       },
       { name: 'solicitud', label: 'Solicitud', type: 'textarea', colSpan: 3 },
       { name: 'observaciones', label: 'Observaciones', type: 'textarea', colSpan: 3 },
+      {
+        name: 'imagenes_soporte',
+        label: 'Imágenes de soporte',
+        type: 'images',
+        colSpan: 3,
+        hint: 'Capturas o fotos del trabajo realizado. Se incluyen en el correo de bitácora.',
+      },
     ],
   },
   {

@@ -411,6 +411,19 @@
                               <h4 class="bit-detail-block__label">Observaciones</h4>
                               <p class="bit-detail-block__text">{{ item.observaciones || '—' }}</p>
                             </article>
+                            <article v-if="soporteImagenes(item).length" class="bit-detail-block">
+                              <h4 class="bit-detail-block__label">Evidencias</h4>
+                              <div class="bit-detail-images">
+                                <figure
+                                  v-for="(img, imgIdx) in soporteImagenes(item)"
+                                  :key="imgIdx"
+                                  class="bit-detail-images__item"
+                                >
+                                  <img :src="img.data" :alt="img.nombre" />
+                                  <figcaption>{{ img.nombre }}</figcaption>
+                                </figure>
+                              </div>
+                            </article>
                           </div>
                         </div>
                       </div>
@@ -602,6 +615,7 @@ const loadingBite = ref(false);
 const pagBite = ref({ page: 1, rowsPerPage: 10, rowsNumber: 0 });
 
 const weekBita = reactive({});
+const bitaDetailCache = reactive({});
 
 const formBiteOpen = ref(false);
 const biteIsEdit = ref(false);
@@ -750,6 +764,17 @@ function monthEndISO(date = new Date()) {
   const m = String(last.getMonth() + 1).padStart(2, '0');
   const day = String(last.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function parseImagenesSoporte(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(String(raw));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function clientKey(cnsbite, cliente) {
@@ -907,7 +932,21 @@ function toggleCliente(cnsbite, cliente) {
 }
 
 function toggleSoporteDetail(cnssoporte) {
-  expandedCnssoporte.value = expandedCnssoporte.value === cnssoporte ? null : cnssoporte;
+  if (expandedCnssoporte.value === cnssoporte) {
+    expandedCnssoporte.value = null;
+    return;
+  }
+  expandedCnssoporte.value = cnssoporte;
+  if (!bitaDetailCache[cnssoporte]) {
+    bitApi.get(cnssoporte)
+      .then((full) => { bitaDetailCache[cnssoporte] = full; })
+      .catch(() => { bitaDetailCache[cnssoporte] = null; });
+  }
+}
+
+function soporteImagenes(item) {
+  const cached = bitaDetailCache[item.cnssoporte];
+  return parseImagenesSoporte(cached?.imagenes_soporte ?? item.imagenes_soporte);
 }
 
 function onFilterChange() {
@@ -989,7 +1028,7 @@ function openBitCreate(cnsbite, explicitCliente = '') {
   formBitOpen.value = true;
 }
 
-function openBitEdit(row) {
+async function openBitEdit(row) {
   if (isSoporteBloqueado(row, row.cnsbite || expandedCnsbite.value)) {
     $q.notify({ type: 'warning', message: soporteBloqueoMensaje(row, row.cnsbite || expandedCnsbite.value) });
     return;
@@ -999,8 +1038,12 @@ function openBitEdit(row) {
     return;
   }
   bitCreateCnsbite.value = row.cnsbite || expandedCnsbite.value || '';
-  bitCurrent.value = { ...row };
   bitIsEdit.value = true;
+  try {
+    bitCurrent.value = await bitApi.get(row.cnssoporte);
+  } catch {
+    bitCurrent.value = { ...row };
+  }
   formBitOpen.value = true;
 }
 
@@ -1076,6 +1119,7 @@ function confirmBitDelete(row) {
 
 function onBitSaved(saved) {
   formBitOpen.value = false;
+  if (saved?.cnssoporte) delete bitaDetailCache[saved.cnssoporte];
   const cnsbite = bitCreateCnsbite.value || expandedCnsbite.value || saved?.cnsbite;
   const cliente = saved?.cliente || bitCurrent.value?.cliente;
   if (cnsbite) {
@@ -1677,6 +1721,36 @@ onMounted(() => {
   color: #334155;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.bit-detail-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.bit-detail-images__item {
+  margin: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.bit-detail-images__item img {
+  display: block;
+  width: 100%;
+  height: 88px;
+  object-fit: cover;
+}
+
+.bit-detail-images__item figcaption {
+  padding: 4px 6px;
+  font-size: 0.68rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bit-actions {

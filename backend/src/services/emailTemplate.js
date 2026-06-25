@@ -91,6 +91,31 @@ function renderActionButton({ href, label, accent }) {
     </table>`;
 }
 
+function renderImageGallery(images = []) {
+  if (!images.length) return '';
+  const cells = images
+    .map(
+      ({ cid, alt }) => `
+        <td style="padding:8px 0 16px;vertical-align:top;">
+          <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#64748b;">${escapeHtml(alt || 'Evidencia')}</p>
+          <img src="cid:${escapeHtml(cid)}" alt="${escapeHtml(alt || 'Evidencia de soporte')}"
+               style="display:block;max-width:100%;width:520px;height:auto;border:1px solid #e2e8f0;border-radius:8px;" />
+        </td>`,
+    )
+    .join('');
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0 0;">
+      <tr>
+        <td style="padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+          <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#0f172a;">Evidencias del soporte</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+            <tr>${cells}</tr>
+          </table>
+        </td>
+      </tr>
+    </table>`;
+}
+
 /**
  * Plantilla HTML responsive compatible con clientes de correo (tablas + estilos inline).
  */
@@ -106,6 +131,7 @@ export function buildNotificationEmailHtml({
   calloutTitle = '',
   calloutText = '',
   actionButton = null,
+  imageGallery = [],
   footerNote = '',
   footerBrand = 'DevSoporte',
 }) {
@@ -156,6 +182,7 @@ export function buildNotificationEmailHtml({
                   : ''
               }
               ${renderCallout({ title: calloutTitle, text: calloutText, accent })}
+              ${renderImageGallery(imageGallery)}
               ${actionButton ? renderActionButton({ ...actionButton, accent: actionButton.accent || accent }) : ''}
             </td>
           </tr>

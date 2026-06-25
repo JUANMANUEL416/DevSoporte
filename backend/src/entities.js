@@ -33,7 +33,7 @@ export const entities = {
   funcionarios: {
     table: 'clief',
     pk: ['codigo', 'documento'],
-    columns: ['codigo', 'documento', 'nombre', 'cargo', 'estado', 'email'],
+    columns: ['codigo', 'documento', 'nombre', 'cargo', 'estado', 'email', 'tratamiento'],
     search: ['documento', 'nombre', 'cargo', 'email'],
     orderBy: 'nombre',
     label: 'Funcionarios del Cliente',
@@ -127,7 +127,7 @@ export const entities = {
   bitacora: {
     table: 'bita',
     pk: ['cnssoporte'],
-    columns: ['cnssoporte', 'fecha', 'cliente', 'soporte', 'funcionario', 'clase', 'solicitud', 'respuesta', 'estado', 'fechar', 'observaciones', 'medio', 'cnsbite', 'firma', 'firma_fecha'],
+    columns: ['cnssoporte', 'fecha', 'cliente', 'soporte', 'funcionario', 'clase', 'solicitud', 'respuesta', 'estado', 'fechar', 'observaciones', 'medio', 'cnsbite', 'firma', 'firma_fecha', 'imagenes_soporte'],
     search: ['cnssoporte', 'cliente', 'funcionario', 'solicitud'],
     orderBy: 'fecha DESC',
     label: 'Bitácora de Soporte',
@@ -138,7 +138,7 @@ export const entities = {
     },
     filterColumns: ['cnsbite', 'cliente', 'estado'],
     listFrom: 'bita b LEFT JOIN clie c ON c.codigo = b.cliente',
-    listSelect: 'b.*, c.nombrecliente',
+    listSelect: 'b.cnssoporte, b.fecha, b.cliente, b.soporte, b.funcionario, b.clase, b.solicitud, b.respuesta, b.estado, b.fechar, b.observaciones, b.medio, b.cnsbite, b.firma_fecha, c.nombrecliente',
     listSearch: ['b.cnssoporte', 'b.cliente', 'b.funcionario', 'b.solicitud', 'c.nombrecliente'],
     tableAlias: 'b',
   },
