@@ -94,10 +94,27 @@ export async function beforeBitacoraUpdate(body, ids) {
   const existing = await assertBitaModificable(ids[0]);
   if (!existing) return;
 
-  if ((existing.estado || '').toLowerCase() === 'terminado') {
-    const err = new Error('El soporte está cerrado y no se puede modificar');
-    err.status = 409;
-    throw err;
+  const isTerminado = (existing.estado || '').toLowerCase() === 'terminado';
+  if (isTerminado) {
+    if (hasFirmaAceptacion(existing)) {
+      const err = new Error('El soporte ya fue firmado y no se puede modificar');
+      err.status = 409;
+      throw err;
+    }
+    const pkSet = new Set(['cnssoporte']);
+    const changedKeys = Object.keys(body).filter(
+      (k) => !pkSet.has(k) && body[k] !== undefined,
+    );
+    const soloImagenes = changedKeys.length === 0
+      || changedKeys.every((k) => k === 'imagenes_soporte');
+    if (!soloImagenes) {
+      const err = new Error(
+        'El soporte está cerrado. Solo puede agregar o cambiar imágenes de soporte antes de enviar el correo.',
+      );
+      err.status = 409;
+      throw err;
+    }
+    return;
   }
 
   const cnsbite = body.cnsbite || existing.cnsbite;

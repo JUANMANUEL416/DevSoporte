@@ -343,12 +343,25 @@
                               flat
                               dense
                               round
+                              icon="add_photo_alternate"
+                              color="deep-orange"
+                              :disable="!puedeEditarEvidencias(item, props.row.cnsbite)"
+                              @click="openBitEvidencias(item)"
+                            >
+                              <q-tooltip>
+                                {{ evidenciasTooltip(item, props.row.cnsbite) }}
+                              </q-tooltip>
+                            </q-btn>
+                            <q-btn
+                              flat
+                              dense
+                              round
                               icon="edit"
                               color="primary"
-                              :disable="isTerminado(item.estado)"
+                              :disable="!puedeEditarSoporte(item, props.row.cnsbite)"
                               @click="openBitEdit(item)"
                             >
-                              <q-tooltip>{{ isTerminado(item.estado) ? 'Soporte cerrado' : 'Editar' }}</q-tooltip>
+                              <q-tooltip>{{ editTooltip(item, props.row.cnsbite) }}</q-tooltip>
                             </q-btn>
                             <q-btn flat dense round icon="delete" color="negative" @click="confirmBitDelete(item)">
                               <q-tooltip>Eliminar</q-tooltip>
@@ -465,6 +478,41 @@
       @send="onNotifySend"
     />
 
+    <q-dialog v-model="evidenciasOpen" persistent>
+      <q-card class="bit-cerrar-dialog" style="min-width: 520px; max-width: 95vw">
+        <q-card-section class="bit-cerrar-dialog__header" style="background: linear-gradient(135deg, #ef6c00 0%, #e65100 100%)">
+          <div>
+            <p class="bit-cerrar-dialog__eyebrow">Evidencias del soporte</p>
+            <div class="bit-cerrar-dialog__title">{{ evidenciasRow?.cnssoporte }}</div>
+          </div>
+          <q-space />
+          <q-btn flat dense round icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <p class="bit-cerrar-dialog__hint">
+            Estas imágenes se guardan con el soporte y se incluyen automáticamente al enviar el correo (no van en el editor del correo).
+          </p>
+          <ImageGalleryField
+            v-if="evidenciasOpen"
+            v-model="evidenciasImagenes"
+            label="Imágenes de soporte"
+            hint="Capturas o fotos del trabajo realizado (máx. 5, 1 MB c/u)."
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" v-close-popup />
+          <q-btn
+            unelevated
+            color="deep-orange"
+            icon="save"
+            label="Guardar evidencias"
+            :loading="evidenciasSaving"
+            @click="saveBitEvidencias"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="cerrarSemanaOpen" persistent>
       <q-card class="bit-cerrar-dialog">
         <q-card-section class="bit-cerrar-dialog__header">
@@ -575,6 +623,7 @@ import { findModule } from 'src/config/modules';
 import GenericForm from 'components/GenericForm.vue';
 import LookupSelect from 'components/LookupSelect.vue';
 import NotifyRecipientDialog from 'components/NotifyRecipientDialog.vue';
+import ImageGalleryField from 'components/ImageGalleryField.vue';
 import PDFViewerComponent from 'components/PDFViewerComponent.vue';
 
 const $q = useQuasar();
@@ -635,6 +684,10 @@ const notifyRecordId = ref('');
 const notifyCnsbite = ref('');
 const sendingNotify = ref(false);
 const sendingNotifyId = ref('');
+const evidenciasOpen = ref(false);
+const evidenciasRow = ref(null);
+const evidenciasImagenes = ref('');
+const evidenciasSaving = ref(false);
 const sendingReporteKey = ref('');
 
 const cerrarSemanaOpen = ref(false);
@@ -705,6 +758,29 @@ function semanaClienteColor(estado) {
 
 function hasFirmaAceptacion(item) {
   return Boolean(item?.firma && String(item.firma).trim()) || Boolean(item?.firma_fecha);
+}
+
+function puedeEditarEvidencias(item, cnsbite) {
+  if (isSoporteBloqueado(item, cnsbite)) return false;
+  if (hasFirmaAceptacion(item)) return false;
+  return true;
+}
+
+function evidenciasTooltip(item, cnsbite) {
+  if (hasFirmaAceptacion(item)) return 'Ya firmado; no se pueden cambiar las imágenes';
+  if (isSoporteBloqueado(item, cnsbite)) return soporteBloqueoMensaje(item, cnsbite);
+  return 'Imágenes de soporte (van en el correo al enviar)';
+}
+
+function puedeEditarSoporte(item, cnsbite) {
+  if (isSoporteBloqueado(item, cnsbite)) return false;
+  return !isTerminado(item.estado);
+}
+
+function editTooltip(item, cnsbite) {
+  if (isSoporteBloqueado(item, cnsbite)) return soporteBloqueoMensaje(item, cnsbite);
+  if (isTerminado(item.estado)) return 'Use el botón naranja para imágenes; el soporte ya está cerrado';
+  return 'Editar soporte (incluye imágenes al final del formulario)';
 }
 
 function isSoporteBloqueado(item, cnsbite) {
@@ -1045,6 +1121,42 @@ async function openBitEdit(row) {
     bitCurrent.value = { ...row };
   }
   formBitOpen.value = true;
+}
+
+async function openBitEvidencias(row) {
+  if (!puedeEditarEvidencias(row, row.cnsbite || expandedCnsbite.value)) {
+    $q.notify({ type: 'warning', message: evidenciasTooltip(row, row.cnsbite || expandedCnsbite.value) });
+    return;
+  }
+  evidenciasRow.value = row;
+  evidenciasImagenes.value = '';
+  evidenciasOpen.value = true;
+  try {
+    const full = await bitApi.get(row.cnssoporte);
+    evidenciasImagenes.value = full.imagenes_soporte || '';
+    evidenciasRow.value = { ...row, ...full };
+  } catch {
+    evidenciasImagenes.value = row.imagenes_soporte || '';
+  }
+}
+
+async function saveBitEvidencias() {
+  if (!evidenciasRow.value?.cnssoporte) return;
+  evidenciasSaving.value = true;
+  try {
+    await bitApi.update(evidenciasRow.value.cnssoporte, {
+      imagenes_soporte: evidenciasImagenes.value || '',
+    });
+    delete bitaDetailCache[evidenciasRow.value.cnssoporte];
+    evidenciasOpen.value = false;
+    $q.notify({ type: 'positive', message: 'Evidencias guardadas' });
+    const cnsbite = evidenciasRow.value.cnsbite || expandedCnsbite.value;
+    if (cnsbite) await loadWeekBita(cnsbite);
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err.response?.data?.error || 'Error al guardar evidencias' });
+  } finally {
+    evidenciasSaving.value = false;
+  }
 }
 
 function openCerrarBit(row) {
