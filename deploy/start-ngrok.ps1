@@ -1,48 +1,61 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Inicia túnel ngrok hacia DevSoporte en producción (puerto 3300).
+  Inicia o reinicia el túnel ngrok vía PM2 (puerto 3300).
 .PARAMETER Domain
-  Dominio reservado ngrok (opcional).
+  Dominio reservado ngrok (opcional; si no, lee backend\.env).
 .EXAMPLE
   .\deploy\start-ngrok.ps1
   .\deploy\start-ngrok.ps1 -Domain crested-gently-landowner.ngrok-free.dev
 #>
 param(
-  [string]$Domain = 'crested-gently-landowner.ngrok-free.dev'
+  [string]$Domain = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 $Port = 3300
 
+Set-Location $Root
+
 try {
   Invoke-RestMethod -Uri "http://localhost:$Port/api/health" -TimeoutSec 3 | Out-Null
 } catch {
-  throw "DevSoporte no responde en http://localhost:$Port. Ejecute: pm2 status"
+  throw "DevSoporte no responde en http://localhost:$Port. Ejecute: pm2 start deploy\ecosystem.config.cjs"
 }
 
-$ngrok = Get-Command ngrok -ErrorAction Stop
-$existing = Get-Process ngrok -ErrorAction SilentlyContinue
-if ($existing) {
-  Write-Host "Deteniendo ngrok anterior (PID $($existing.Id))..." -ForegroundColor Yellow
-  Stop-Process -Id $existing.Id -Force
-  Start-Sleep -Seconds 1
+if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
+  throw 'ngrok no está instalado. https://ngrok.com/download'
 }
 
-$args = @('http', $Port)
+if (-not (Get-Command pm2 -ErrorAction SilentlyContinue)) {
+  throw 'PM2 no está instalado. npm install -g pm2'
+}
+
+$env:NGROK_PORT = "$Port"
 if ($Domain) {
-  $args += @('--domain', $Domain)
+  $env:NGROK_DOMAIN = $Domain
 }
 
-Write-Host "Iniciando ngrok -> localhost:$Port" -ForegroundColor Cyan
-if ($Domain) {
-  Write-Host "Dominio: https://$Domain"
+# Evita ERR_NGROK_334 si quedó un ngrok manual u otro túnel con el mismo dominio.
+pm2 stop ngrok-devsoporte 2>$null | Out-Null
+Get-Process ngrok -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
+
+$desc = pm2 describe ngrok-devsoporte 2>$null
+if ($LASTEXITCODE -eq 0) {
+  Write-Host 'Reiniciando ngrok-devsoporte (PM2)...' -ForegroundColor Cyan
+  pm2 restart ngrok-devsoporte --update-env
+} else {
+  Write-Host 'Iniciando ngrok-devsoporte (PM2)...' -ForegroundColor Cyan
+  pm2 start (Join-Path $Root 'deploy\ecosystem.config.cjs') --env production --only ngrok-devsoporte --update-env
 }
 
-Start-Process -FilePath $ngrok.Source -ArgumentList $args -WindowStyle Normal
-
+pm2 save | Out-Null
 Start-Sleep -Seconds 3
-Write-Host "`nVerifique la URL en la ventana de ngrok o en http://127.0.0.1:4040" -ForegroundColor Green
-Write-Host "PUBLIC_APP_URL y CORS_ORIGIN deben coincidir con esa URL en backend\.env"
-Write-Host "Luego: pm2 restart devsoporte --update-env"
+
+Write-Host "`nTunel ngrok gestionado por PM2." -ForegroundColor Green
+Write-Host "Estado: pm2 status ngrok-devsoporte"
+Write-Host "Logs:   pm2 logs ngrok-devsoporte"
+Write-Host "Panel:  http://127.0.0.1:4040"
+Write-Host "PUBLIC_APP_URL y CORS_ORIGIN deben coincidir con la URL en backend\.env"
