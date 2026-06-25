@@ -9,7 +9,7 @@ ON CONFLICT (usuario) DO NOTHING;
 
 -- Consecutivos base
 INSERT INTO acns (prefijo, consecutivo) VALUES
-    ('SOP', 0), ('REQ', 0), ('AGE', 0), ('INF', 0), ('LIC', 0), ('SRE', 0), ('CAP', 0), ('RASIST', 0), ('BITE', 0), ('BITA', 0)
+    ('SOP', 0), ('REQ', 0), ('AGE', 0), ('INF', 0), ('LIC', 0), ('SRE', 0), ('CAP', 0), ('RASIST', 0), ('BITE', 0), ('BITA', 0), ('DEVDES', 0), ('DEVFIX', 0), ('DEVHOT', 0)
 ON CONFLICT (prefijo) DO NOTHING;
 
 -- Catálogos de la Tabla Genérica (TGEN)

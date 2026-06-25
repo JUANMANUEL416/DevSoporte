@@ -535,3 +535,35 @@ CREATE TABLE IF NOT EXISTS actproy (
 );
 CREATE INDEX IF NOT EXISTS actproy_cliente ON actproy (cliente, consecutivo);
 CREATE INDEX IF NOT EXISTS actproy_fecha ON actproy (fecha DESC);
+
+-- ----------------------------------------------------------------------------
+-- Control de versiones y cambios de desarrollo
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS devver (
+    version     VARCHAR(20) PRIMARY KEY,
+    fecha       TIMESTAMP DEFAULT NOW(),
+    resumen     VARCHAR(500),
+    changelog   TEXT,
+    usuario     VARCHAR(20)
+);
+
+CREATE TABLE IF NOT EXISTS devcamb (
+    consecutivo   VARCHAR(20) PRIMARY KEY,
+    tipo          VARCHAR(10) NOT NULL CHECK (tipo IN ('feature', 'fix', 'hotfix')),
+    rama          VARCHAR(100) NOT NULL,
+    titulo        VARCHAR(200) NOT NULL,
+    descripcion   TEXT,
+    cambios       TEXT,
+    estado        VARCHAR(20) NOT NULL DEFAULT 'en_desarrollo'
+                  CHECK (estado IN ('en_desarrollo', 'integrado', 'publicado')),
+    version       VARCHAR(20) REFERENCES devver(version),
+    f_inicio      TIMESTAMP DEFAULT NOW(),
+    f_terminacion TIMESTAMP,
+    f_integracion TIMESTAMP,
+    f_publicacion TIMESTAMP,
+    usuario       VARCHAR(20)
+);
+CREATE INDEX IF NOT EXISTS devcamb_estado ON devcamb (estado, f_inicio DESC);
+CREATE INDEX IF NOT EXISTS devcamb_version ON devcamb (version);
+CREATE INDEX IF NOT EXISTS devver_fecha ON devver (fecha DESC);
+

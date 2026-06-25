@@ -43,6 +43,8 @@ import {
 } from './routes/actproy.js';
 import { beforeActproyCreate, beforeActproyUpdate } from './services/actproyHooks.js';
 import { beforeSoportCreate, beforeSoportUpdate } from './services/soportHooks.js';
+import { beforeDevcambCreate, beforeDevcambUpdate } from './services/devcambHooks.js';
+import controlVersionesRoutes from './routes/controlVersiones.js';
 
 async function ensureCapacitacionAbierta(cnscapacita) {
   if (!cnscapacita) return;
@@ -131,6 +133,10 @@ const entityHooks = {
     beforeCreate: beforeSoportCreate,
     beforeUpdate: beforeSoportUpdate,
   },
+  cambios_desarrollo: {
+    beforeCreate: beforeDevcambCreate,
+    beforeUpdate: beforeDevcambUpdate,
+  },
 };
 
 // DevSoporte API
@@ -171,6 +177,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/semanas', requireAuth, semanasRoutes);
 app.use('/api/correos', requireAuth, correosRoutes);
+app.use('/api/control-versiones', requireAuth, controlVersionesRoutes);
 
 // Expone la lista de entidades disponibles (útil para el menú dinámico).
 app.get('/api/entities', requireAuth, (req, res) => {

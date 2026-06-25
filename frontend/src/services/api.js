@@ -94,3 +94,10 @@ export const notificacionApi = {
   bitacora: (id, payload) =>
     api.post(`/bitacora/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
 };
+
+export const controlVersionesApi = {
+  resumen: () => api.get('/control-versiones/resumen').then((r) => r.data),
+  integrar: (consecutivo, payload = {}) =>
+    api.post(`/control-versiones/${encodeURIComponent(consecutivo)}/integrar`, payload).then((r) => r.data),
+  publicar: (payload) => api.post('/control-versiones/publicar', payload).then((r) => r.data),
+};
