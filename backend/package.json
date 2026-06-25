@@ -1,6 +1,6 @@
 {
   "name": "devsoporte-backend",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "API REST para DevSoporte (migración del sistema Clarion a Node + PostgreSQL)",
   "type": "module",
   "main": "src/server.js",
