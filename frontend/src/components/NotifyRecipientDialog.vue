@@ -243,7 +243,7 @@
                 </span>
               </div>
               <p class="notify-dialog__images-hint">
-                Se incluirán en el correo. Puede quitar alguna antes de enviar.
+                Miniaturas en el cuerpo del correo; las imágenes completas van adjuntas. Puede quitar alguna antes de enviar.
               </p>
               <div class="notify-dialog__images-list">
                 <article
@@ -436,7 +436,7 @@ const previewNombre = computed(() => {
 
 const imagenesPreviewNote = computed(() => {
   if (!isBitacoraMode.value || !imagenesSoporte.value.length) return '';
-  return `\n\n(Evidencias adjuntas: ${imagenesSoporte.value.length} imagen(es))`;
+  return `\n\n(Evidencias: ${imagenesSoporte.value.length} miniatura(s) en el cuerpo + adjuntos en tamaño completo)`;
 });
 
 watch(

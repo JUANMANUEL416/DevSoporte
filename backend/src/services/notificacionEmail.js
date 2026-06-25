@@ -138,7 +138,7 @@ function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, inclu
         calloutText: firmaUrl
           ? 'Al abrir el enlace ingrese su documento. Solo el funcionario que solicitó el soporte verá el espacio para firmar.'
           : imageGallery.length
-            ? 'Este correo incluye imágenes de soporte del trabajo realizado (adjuntas y en el cuerpo del mensaje).'
+            ? 'Las evidencias aparecen en miniatura en el cuerpo del correo. Las imágenes completas van adjuntas para abrirlas en tamaño real.'
             : 'Este correo resume el registro de soporte atendido por nuestro equipo.',
         actionButton,
         imageGallery,
@@ -335,7 +335,7 @@ export async function previewNotificacionBitacora(cnssoporte) {
   const cliente = bita.cliente ? await loadCliente(bita.cliente) : null;
   const funcionario = await loadFuncionarioDestinatario(bita);
   const firmaUrl = createBitacoraFirmaLink(cnssoporte);
-  const imagenesPayload = buildImagenesEmailPayload(bita.imagenes_soporte);
+  const imagenesPayload = await buildImagenesEmailPayload(bita.imagenes_soporte);
   const bundle = buildBitacoraEmailBundle(bita, cliente, '', {
     firmaUrl,
     incluyeFirma: true,
@@ -458,7 +458,7 @@ export async function enviarNotificacionBitacora(cnssoporte, body = {}, usuario 
   const toList = resolveFuncionarioDestinatarios(funcionario, toEmails);
   const ccList = resolveEquipoDestinatarios(cliente, ccEmails);
   const firmaUrl = createBitacoraFirmaLink(cnssoporte);
-  const imagenesPayload = buildImagenesEmailPayload(bita.imagenes_soporte);
+  const imagenesPayload = await buildImagenesEmailPayload(bita.imagenes_soporte);
   const bodyTemplate = String(body.body || '').trim();
   const bundle = buildBitacoraEmailBundle(bita, cliente, bodyTemplate, {
     firmaUrl,
@@ -471,6 +471,7 @@ export async function enviarNotificacionBitacora(cnssoporte, body = {}, usuario 
     content: a.content,
     contentType: a.contentType,
     cid: a.cid,
+    contentDisposition: a.contentDisposition,
   }));
 
   return sendActaCapacitacionEmail({
