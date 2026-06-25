@@ -2,6 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.1.4] - 2026-06-25
+
+### Agregado
+- Miniaturas de evidencias en el cuerpo del correo de bitácora; imágenes completas como adjuntos.
+- Badge y contador de imágenes en listado de bitácora; mejoras UX del modal de evidencias.
+
+### Cambiado
+- Saludo del correo con tratamiento del funcionario solicitante; listado de imágenes con opción Quitar.
+
 ## [1.1.3] - 2026-06-25
 
 ### Agregado
@@ -30,5 +39,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 ### Agregado
 - Migración inicial Clarion → web (bitácora, capacitaciones, firmas, clientes, catálogos).
 
+[1.1.4]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.0...v1.1.3
 [1.1.0]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/JUANMANUEL416/DevSoporte/releases/tag/v1.0.0
