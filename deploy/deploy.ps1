@@ -36,6 +36,23 @@ if (Test-Path $envFile) {
 $version = (Get-Content (Join-Path $Root 'VERSION') -Raw).Trim()
 Write-Host "Rama: $branch  Version: $version"
 
+Push-Location (Join-Path $Root 'backend')
+try {
+  $integradosJson = node --input-type=module -e "import { listIntegrados } from './src/services/controlVersionesPublish.js'; const rows = await listIntegrados(); console.log(JSON.stringify(rows.map(r => r.consecutivo))); process.exit(0);"
+  $integrados = @()
+  if ($integradosJson) {
+    $integrados = $integradosJson | ConvertFrom-Json
+  }
+  if ($integrados -and $integrados.Count -gt 0) {
+    Write-Host "AVISO: Hay $($integrados.Count) cambio(s) integrado(s) sin publicar en Control de Versiones." -ForegroundColor Yellow
+    Write-Host "  Ejecute npm run release antes del deploy para actualizar devver/devcamb y el tag Git." -ForegroundColor Yellow
+    Write-Host "  Pendientes: $($integrados -join ', ')" -ForegroundColor DarkYellow
+  }
+} catch {
+  Write-Host "AVISO: No se pudo verificar cambios integrados pendientes." -ForegroundColor DarkGray
+}
+Pop-Location
+
 if (-not $SkipPull) {
   Write-Step "Actualizando codigo (git pull origin master)"
   git pull origin master

@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.1.3] - 2026-06-25
+
+### Agregado
+- Imágenes de soporte en bitácora (formulario, detalle y correo con adjuntos e inline).
+- Campo **Tratamiento** en funcionarios (Doctor, Sra., etc.) para saludo en correos.
+- Botón de evidencias en soportes cerrados antes de enviar el correo.
+
+### Cambiado
+- `npm run release` publica cambios integrados en `devver` / `devcamb` y actualiza `VERSION`.
+
 ## [1.1.0] - 2026-06-23
 
 ### Agregado

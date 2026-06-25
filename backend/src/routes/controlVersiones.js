@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { getAppVersion } from '../version.js';
+import { publicarVersion } from '../services/controlVersionesPublish.js';
 
 const router = Router();
 
@@ -55,52 +56,16 @@ router.post('/:consecutivo/integrar', async (req, res, next) => {
 router.post('/publicar', async (req, res, next) => {
   try {
     const { version, resumen, changelog, consecutivos } = req.body || {};
-    if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-      return res.status(400).json({ error: 'Indique una versión semver válida (ej. 1.2.0)' });
-    }
-    if (!Array.isArray(consecutivos) || !consecutivos.length) {
-      return res.status(400).json({ error: 'Seleccione al menos un cambio integrado' });
-    }
-
-    const integrados = await query(
-      `SELECT consecutivo FROM devcamb
-       WHERE consecutivo = ANY($1::text[]) AND estado = 'integrado'`,
-      [consecutivos],
-    );
-    if (integrados.rows.length !== consecutivos.length) {
-      return res.status(400).json({
-        error: 'Solo se pueden publicar cambios en estado integrado',
-      });
-    }
-
-    await query(
-      `INSERT INTO devver (version, resumen, changelog, usuario)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (version) DO UPDATE
-       SET resumen = EXCLUDED.resumen,
-           changelog = EXCLUDED.changelog,
-           fecha = NOW(),
-           usuario = EXCLUDED.usuario`,
-      [version, resumen || null, changelog || null, req.user?.usuario || null],
-    );
-
-    const published = await query(
-      `UPDATE devcamb
-       SET estado = 'publicado',
-           version = $1,
-           f_publicacion = NOW(),
-           f_terminacion = COALESCE(f_terminacion, NOW())
-       WHERE consecutivo = ANY($2::text[])
-       RETURNING *`,
-      [version, consecutivos],
-    );
-
-    res.json({
+    const result = await publicarVersion({
       version,
-      publicados: published.rows.length,
-      cambios: published.rows,
+      resumen,
+      changelog,
+      consecutivos,
+      usuario: req.user?.usuario || null,
     });
+    res.json(result);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     next(err);
   }
 });

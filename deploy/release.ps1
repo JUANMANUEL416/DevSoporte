@@ -1,12 +1,17 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Crea tag de versión desde VERSION, hace commit pendiente y publica a GitHub.
+  Publica versión: registra en devver/devcamb, crea tag Git y sube a GitHub.
+.PARAMETER Message
+  Mensaje adicional para el commit de release.
+.PARAMETER SkipPublish
+  No ejecuta publicación en control de versiones (solo tag Git).
 .EXAMPLE
-  .\deploy\release.ps1 -Message "Corrección menor"
+  .\deploy\release.ps1 -Message "Imagenes bitacora y tratamiento"
 #>
 param(
-  [string]$Message = ''
+  [string]$Message = '',
+  [switch]$SkipPublish
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,10 +31,25 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') {
 $tag = "v$version"
 Write-Host "Versión: $version  Tag: $tag" -ForegroundColor Cyan
 
+if (-not $SkipPublish) {
+  Write-Host "`n==> Control de versiones (devver / devcamb)" -ForegroundColor Cyan
+  Push-Location (Join-Path $Root 'backend')
+  try {
+    node scripts/publicar-version.mjs --auto-integrados --version $version
+  } catch {
+    Pop-Location
+    throw
+  }
+  Pop-Location
+  $version = (Get-Content (Join-Path $Root 'VERSION') -Raw).Trim()
+  $tag = "v$version"
+}
+
 $status = git status --porcelain
 if ($status) {
   $commitMsg = if ($Message) { "Release $tag - $Message" } else { "Release $tag" }
-  git add -A
+  git add VERSION CHANGELOG.md
+  git add -u
   git commit -m $commitMsg
 }
 
@@ -44,4 +64,5 @@ git push origin master
 git push origin $tag
 
 Write-Host "`nPublicado: $tag" -ForegroundColor Green
+Write-Host "Control de versiones actualizado (devver + devcamb publicados)."
 Write-Host "https://github.com/JUANMANUEL416/DevSoporte/releases/tag/$tag"
