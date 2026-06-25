@@ -9,6 +9,14 @@ import { entities } from './entities.js';
 import { crudRouter } from './crudRouter.js';
 import { query } from './db/pool.js';
 import { getAppVersion } from './version.js';
+import {
+  appEnv,
+  assertPruebasIsolation,
+  getAppEnvLabel,
+  getDatabaseName,
+  isPruebas,
+  isProduction,
+} from './config/env.js';
 import { sendFirmaLinkEmail } from './services/firmaEmail.js';
 import { applyClienteNotificaciones } from './services/clienteNotificaciones.js';
 import {
@@ -140,6 +148,7 @@ const entityHooks = {
 };
 
 // DevSoporte API
+assertPruebasIsolation();
 const app = express();
 
 const corsOrigins = (process.env.CORS_ORIGIN || '*')
@@ -165,6 +174,11 @@ app.get('/api/health', (req, res) =>
     ok: true,
     service: 'DevSoporte API',
     version: getAppVersion(),
+    appEnv,
+    appEnvLabel: getAppEnvLabel(),
+    isPruebas,
+    isProduction,
+    database: getDatabaseName(),
     env: process.env.NODE_ENV || 'development',
     mailConfigured: isMailConfigured(),
   }),
@@ -233,7 +247,6 @@ for (const [key, entity] of Object.entries(entities)) {
   app.use(`/api/${key}`, requireAuth, crudRouter({ ...entity, ...hooks }));
 }
 
-const isProduction = process.env.NODE_ENV === 'production';
 if (isProduction) {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const spaDir = path.join(__dirname, '../../frontend/dist/spa');
@@ -255,8 +268,13 @@ app.use((err, req, res, next) => {
 
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {
-  const mode = isProduction ? 'producción' : 'desarrollo';
-  console.log(`DevSoporte v${getAppVersion()} (${mode}) → http://localhost:${port}`);
+  const mode = isProduction ? 'producción' : isPruebas ? 'pruebas' : 'desarrollo';
+  const envTag = isPruebas ? ' [PRUEBAS]' : '';
+  console.log(`DevSoporte v${getAppVersion()} (${mode})${envTag} → http://localhost:${port}`);
+  console.log(`Entorno: ${getAppEnvLabel()} | Base de datos: ${getDatabaseName()}`);
+  if (isPruebas) {
+    console.log('Producción no se detiene: PM2/servicio real sigue en http://localhost:3300 (BD devsoporte).');
+  }
   if (isProduction) {
     console.log('Frontend SPA servido desde el mismo puerto.');
   }

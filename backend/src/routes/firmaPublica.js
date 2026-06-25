@@ -8,7 +8,7 @@ import {
   emailSkipReasonMessage,
 } from '../services/firmaEmail.js';
 import { loadInvitePublicContext, registerAsistenteFromInvite } from '../services/registroAsistente.js';
-import { loadBitacoraFirmaContext, saveBitacoraFirma, getBitacoraFirmaEstado } from '../services/bitacoraFirma.js';
+import { loadBitacoraFirmaContext, saveBitacoraFirma, getBitacoraFirmaEstado, validarDocumentoFirmanteBitacora } from '../services/bitacoraFirma.js';
 import { getActproyFirmaEstado, saveActproyFirma } from '../services/actproyFirma.js';
 
 function validateFirmaDataUrl(firma) {
@@ -91,6 +91,7 @@ publicFirmaRouter.get('/:token', async (req, res, next) => {
         firmado: Boolean(row.firma && String(row.firma).trim()),
         firma_fecha: row.firma_fecha || null,
         puedeFirmar: estado.puedeFirmar,
+        requiereDocumento: true,
         bloqueoMotivo: estado.bloqueoMotivo || '',
       });
     }
@@ -146,6 +147,29 @@ publicFirmaRouter.get('/:token', async (req, res, next) => {
   }
 });
 
+publicFirmaRouter.post('/:token/validar-documento', async (req, res, next) => {
+  try {
+    const payload = verifySigningToken(req.params.token);
+    if (payload.scope !== 'bitacora_firma') {
+      return res.status(400).json({ error: 'Validación de documento no aplica a este enlace' });
+    }
+    const documento = String(req.body?.documento || '').trim();
+    if (!documento) {
+      return res.status(400).json({ valido: false, motivo: 'Ingrese su número de documento' });
+    }
+    const result = await validarDocumentoFirmanteBitacora(payload.cnssoporte, documento);
+    res.json(result);
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(410).json({ error: 'El enlace de firma ha expirado' });
+    }
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(400).json({ error: 'Enlace de firma inválido' });
+    }
+    next(err);
+  }
+});
+
 publicFirmaRouter.post('/:token', async (req, res, next) => {
   try {
     const payload = verifySigningToken(req.params.token);
@@ -179,7 +203,13 @@ publicFirmaRouter.post('/:token', async (req, res, next) => {
       if (!validateFirmaDataUrl(firma)) {
         return res.status(400).json({ error: 'Firma inválida' });
       }
-      const saved = await saveBitacoraFirma(payload.cnssoporte, firma);
+      const documento = String(req.body?.documento || '').trim();
+      if (!documento) {
+        return res.status(400).json({ error: 'Ingrese su número de documento' });
+      }
+      const saved = await saveBitacoraFirma(payload.cnssoporte, firma, {
+        documentoIngresado: documento,
+      });
       return res.json({
         ok: true,
         message: 'Firma de aceptación registrada correctamente',

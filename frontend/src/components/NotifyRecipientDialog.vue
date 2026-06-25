@@ -354,7 +354,7 @@ const previewSample = computed(() => {
       .filter((c) => selectedCc.value.includes(c.email))
       .map((c) => c.email)
       .join(', ') || '(ninguno)';
-    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Incluye botón: Firma aceptación de la solución)`;
+    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Enlace compartido: al abrirlo se pide documento; solo el funcionario solicitante puede firmar.)`;
   }
   if (isSemanaReportMode.value) {
     const para = allContactosTo.value
@@ -476,24 +476,32 @@ watch(
         selectedTo.value = contactosTo.value.map((c) => c.email);
         selectedCc.value = contactosCc.value.map((c) => c.email);
       } else if (isBitacoraMode.value) {
-        contactosTo.value = preview.funcionario?.email
-          ? [{
-            id: `func-${preview.funcionario.email}`,
-            email: preview.funcionario.email,
-            nombre: preview.funcionario.nombre || preview.funcionario.email,
-            cargo: 'Funcionario solicitante',
-          }]
-          : [];
-        contactosCc.value = (destData.equipoConEmail || []).map((c, i) => ({
-          ...c,
-          id: `cc-${i}-${c.email}`,
-        }));
+        const paraMap = new Map();
+        const addPara = (c, cargo) => {
+          const email = String(c?.email || '').trim();
+          if (!email) return;
+          const key = email.toLowerCase();
+          if (paraMap.has(key)) return;
+          paraMap.set(key, {
+            id: `para-${key}`,
+            email,
+            nombre: c.nombre || email,
+            cargo: cargo || c.cargo || '',
+          });
+        };
+        if (preview.funcionario?.email) {
+          addPara(preview.funcionario, 'Funcionario solicitante');
+        }
+        for (const c of destData.contactosConEmail || []) addPara(c, c.cargo || 'Contacto cliente');
+        for (const c of destData.equipoConEmail || []) addPara(c, c.cargo || 'Equipo');
+        contactosTo.value = [...paraMap.values()];
+        contactosCc.value = [];
         selectedTo.value = contactosTo.value.map((c) => c.email);
-        selectedCc.value = contactosCc.value.map((c) => c.email);
+        selectedCc.value = [];
         if (!contactosTo.value.length) {
           $q.notify({
             type: 'warning',
-            message: 'El funcionario no tiene correo registrado. Agregue uno manualmente en Para.',
+            message: 'No hay contactos con correo. Agregue destinatarios manualmente en Para.',
           });
         }
       } else {

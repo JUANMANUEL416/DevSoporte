@@ -150,12 +150,59 @@
             <q-banner v-if="info.firmado && isBitacora" dense rounded class="bg-orange-1 text-orange-10 q-mb-md">
               Este soporte ya fue firmado y no admite cambios.
             </q-banner>
+            <q-banner v-else-if="isBitacora && !info.puedeFirmar" dense rounded class="bg-orange-1 text-orange-10 q-mb-md">
+              {{ info.bloqueoMotivo || 'No se puede firmar este soporte.' }}
+            </q-banner>
+            <q-banner v-else-if="isBitacora && bitacoraDocRechazado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
+              {{ bitacoraDocMensaje }}
+            </q-banner>
             <q-banner v-else-if="info.firmado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
               Ya existe una firma registrada. Puede actualizarla dibujando de nuevo o subiendo otra imagen.
             </q-banner>
+
+            <div
+              v-if="isBitacora && info.puedeFirmar && !info.firmado && !bitacoraDocValidado"
+              class="q-mb-md"
+            >
+              <p class="text-body2 q-mb-sm">
+                Ingrese su número de documento para continuar. Solo el funcionario que solicitó el soporte
+                (<strong>{{ info.funcionario || '—' }}</strong>) podrá firmar.
+              </p>
+              <div class="row q-col-gutter-sm items-start">
+                <div class="col-grow">
+                  <q-input
+                    v-model="bitacoraDocumento"
+                    label="Número de documento *"
+                    outlined
+                    dense
+                    :disable="validandoDocumento"
+                    @keyup.enter="validarDocumentoBitacora"
+                  />
+                </div>
+                <div class="col-auto">
+                  <q-btn
+                    color="primary"
+                    label="Continuar"
+                    no-caps
+                    :loading="validandoDocumento"
+                    @click="validarDocumentoBitacora"
+                  />
+                </div>
+              </div>
+            </div>
           </q-card-section>
 
-          <q-card-section v-if="!isBitacoraBlocked" class="q-pt-none">
+          <q-card-section v-if="mostrarFirmaBitacora" class="q-pt-none">
+            <SignaturePad
+              :titulo="signatureTitle"
+              height="200px"
+              :show-cancel="false"
+              :allow-upload="true"
+              @save="onSave"
+            />
+          </q-card-section>
+
+          <q-card-section v-else-if="!isBitacora && !isBitacoraBlocked" class="q-pt-none">
             <SignaturePad
               :titulo="signatureTitle"
               height="200px"
@@ -191,12 +238,23 @@ const done = ref(false);
 const info = ref(null);
 const saving = ref(false);
 const form = ref({ email: '', documento: '', nombres: '', cargo: '' });
+const bitacoraDocumento = ref('');
+const bitacoraDocValidado = ref(false);
+const bitacoraDocRechazado = ref(false);
+const bitacoraDocMensaje = ref('');
+const validandoDocumento = ref(false);
 
 const isInvite = computed(() => info.value?.mode === 'invite');
 const isBitacora = computed(() => info.value?.mode === 'bitacora');
 const isActproy = computed(() => info.value?.mode === 'actproy');
 const isCapacitacionFirma = computed(() => info.value?.mode === 'firma' || isInvite.value);
 const isBitacoraBlocked = computed(() => isBitacora.value && info.value?.puedeFirmar === false);
+const mostrarFirmaBitacora = computed(() =>
+  isBitacora.value
+  && info.value?.puedeFirmar
+  && !info.value?.firmado
+  && bitacoraDocValidado.value,
+);
 
 const pageTitle = computed(() => {
   if (isBitacora.value) return 'Firma aceptación de la solución';
@@ -233,7 +291,7 @@ async function loadInfo() {
   try {
     const { data } = await api.get(`/public/firma/${encodeURIComponent(token)}`);
     info.value = data;
-    if ((data.mode === 'bitacora' || data.mode === 'actproy') && data.puedeFirmar === false) {
+    if (data.mode === 'actproy' && data.puedeFirmar === false) {
       blocked.value = true;
       blockedMessage.value = data.bloqueoMotivo || 'No se puede firmar.';
       return;
@@ -250,6 +308,40 @@ async function loadInfo() {
     error.value = err.response?.data?.error || 'Enlace inválido o expirado';
   } finally {
     loading.value = false;
+  }
+}
+
+async function validarDocumentoBitacora() {
+  const documento = String(bitacoraDocumento.value || '').trim();
+  if (!documento) {
+    $q.notify({ type: 'warning', message: 'Ingrese su número de documento' });
+    return;
+  }
+  validandoDocumento.value = true;
+  bitacoraDocRechazado.value = false;
+  bitacoraDocMensaje.value = '';
+  try {
+    const { data } = await api.post(
+      `/public/firma/${encodeURIComponent(token)}/validar-documento`,
+      { documento },
+    );
+    if (data.valido) {
+      bitacoraDocValidado.value = true;
+      bitacoraDocRechazado.value = false;
+    } else {
+      bitacoraDocValidado.value = false;
+      bitacoraDocRechazado.value = true;
+      bitacoraDocMensaje.value = data.motivo
+        || 'El documento no corresponde al funcionario autorizado. Puede revisar la información del soporte.';
+    }
+  } catch (err) {
+    bitacoraDocValidado.value = false;
+    bitacoraDocRechazado.value = true;
+    bitacoraDocMensaje.value = err.response?.data?.motivo
+      || err.response?.data?.error
+      || 'No se pudo validar el documento';
+  } finally {
+    validandoDocumento.value = false;
   }
 }
 
@@ -271,6 +363,8 @@ async function onSave(dataUrl) {
       body = { ...form.value, firma: dataUrl };
     } else if (isActproy.value) {
       body = { firma: dataUrl, nombres: form.value.nombres };
+    } else if (isBitacora.value) {
+      body = { firma: dataUrl, documento: bitacoraDocumento.value.trim() };
     } else {
       body = { firma: dataUrl };
     }

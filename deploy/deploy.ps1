@@ -25,6 +25,14 @@ if ($branch -ne 'master') {
   throw "El despliegue solo se permite desde la rama master (actual: $branch)."
 }
 
+$envFile = Join-Path $Root 'backend\.env'
+if (Test-Path $envFile) {
+  $envText = Get-Content $envFile -Raw
+  if ($envText -match '(?m)^\s*APP_ENV\s*=\s*pruebas\s*$') {
+    throw "backend\.env tiene APP_ENV=pruebas. Restaure APP_ENV=production antes de desplegar."
+  }
+}
+
 $version = (Get-Content (Join-Path $Root 'VERSION') -Raw).Trim()
 Write-Host "Rama: $branch  Version: $version"
 

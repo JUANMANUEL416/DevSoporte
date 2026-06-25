@@ -1,11 +1,16 @@
 <template>
   <q-layout view="hHh lpR fFf">
-    <q-header elevated class="bg-primary text-white">
+    <q-banner v-if="runtime.isPruebas" dense class="bg-orange-9 text-white text-center">
+      ENTORNO DE PRUEBAS — {{ runtime.database }} · Producción sigue activa en puerto 3300
+    </q-banner>
+    <q-header elevated :class="runtime.isPruebas ? 'bg-orange-9 text-white' : 'bg-primary text-white'">
       <q-toolbar>
         <q-btn flat dense round icon="menu" aria-label="Menu" @click="drawer = !drawer" />
         <q-toolbar-title>DevSoporte</q-toolbar-title>
         <q-space />
-        <span class="layout-version q-mr-md">v{{ appVersion }}</span>
+        <span class="layout-version q-mr-md">
+          v{{ appVersion }}<template v-if="runtime.isPruebas"> · Pruebas</template>
+        </span>
         <div class="q-mr-md layout-user">{{ auth.user?.nombre || auth.user?.usuario }}</div>
         <q-btn flat dense round icon="logout" @click="logout">
           <q-tooltip>Salir</q-tooltip>
@@ -79,15 +84,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from 'src/stores/auth';
 import { modulesByGroup } from 'src/config/modules';
+import { appApi } from 'src/services/api';
 
 const drawer = ref(true);
 const auth = useAuthStore();
 const router = useRouter();
 const appVersion = process.env.APP_VERSION || '0.0.0';
+const runtime = ref({
+  isPruebas: false,
+  isProduction: false,
+  appEnv: 'development',
+  database: '',
+});
 const groups = modulesByGroup();
 const expandedGroups = ref(
   Object.fromEntries(Object.keys(groups).map((group) => [group, true])),
@@ -117,6 +129,20 @@ function logout() {
   auth.logout();
   router.push('/login');
 }
+
+onMounted(async () => {
+  try {
+    const health = await appApi.health();
+    runtime.value = {
+      isPruebas: Boolean(health.isPruebas),
+      isProduction: Boolean(health.isProduction),
+      appEnv: health.appEnv || 'development',
+      database: health.database || '',
+    };
+  } catch {
+    // Sin API (p. ej. login) no bloquea la UI.
+  }
+});
 </script>
 
 <style scoped lang="scss">

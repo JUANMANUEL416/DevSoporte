@@ -3,6 +3,7 @@
 .env.local
 .env.*.local
 backend/.env
+backend/.env.pruebas
 frontend/.env
 
 # Plantillas sin credenciales reales (sí se versionan)

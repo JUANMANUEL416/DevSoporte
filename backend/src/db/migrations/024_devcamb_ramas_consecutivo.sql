@@ -4,7 +4,16 @@
 ALTER TABLE devcamb ADD COLUMN IF NOT EXISTS f_inicio TIMESTAMP;
 ALTER TABLE devcamb ADD COLUMN IF NOT EXISTS f_terminacion TIMESTAMP;
 
-UPDATE devcamb SET f_inicio = COALESCE(f_inicio, f_solicitud, NOW()) WHERE f_inicio IS NULL;
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'devcamb' AND column_name = 'f_solicitud'
+  ) THEN
+    UPDATE devcamb SET f_inicio = COALESCE(f_inicio, f_solicitud, NOW()) WHERE f_inicio IS NULL;
+  ELSE
+    UPDATE devcamb SET f_inicio = COALESCE(f_inicio, NOW()) WHERE f_inicio IS NULL;
+  END IF;
+END $$;
 
 INSERT INTO acns (prefijo, consecutivo) VALUES
   ('DEVDES', 0),

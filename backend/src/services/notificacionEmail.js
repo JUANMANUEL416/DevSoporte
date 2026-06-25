@@ -91,8 +91,8 @@ function buildCapacitacionEmailBundle(cap, cliente, bodyTemplate, { pdfFilename 
   };
 }
 
-function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl } = {}) {
-  const defaults = buildBitacoraNotificacionContent(bita, cliente);
+function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, incluyeFirma = Boolean(firmaUrl) } = {}) {
+  const defaults = buildBitacoraNotificacionContent(bita, cliente, { incluyeFirma });
   const sourceBody = String(bodyTemplate || '').trim() || defaults.body;
   const introTemplate = extractIntroFromBody(sourceBody, defaults.body);
   const nombre = '{{nombre}}';
@@ -130,10 +130,12 @@ function buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl } = {}
         rows,
         calloutTitle: firmaUrl ? 'Aceptación de la solución' : 'Información',
         calloutText: firmaUrl
-          ? 'Por favor confirme que la solución brindada es satisfactoria firmando digitalmente. También puede subir una imagen de su firma si ya la tiene preparada.'
+          ? 'Al abrir el enlace ingrese su documento. Solo el funcionario que solicitó el soporte verá el espacio para firmar.'
           : 'Este correo resume el registro de soporte atendido por nuestro equipo.',
         actionButton,
-        footerNote: 'El equipo de la clínica recibe este mensaje en copia (CC).',
+        footerNote: firmaUrl
+          ? 'Todos los destinatarios reciben el enlace; la firma solo está disponible tras validar el documento del solicitante.'
+          : 'Copia informativa del registro de soporte.',
       });
       const text = buildPlainNotificationEmail({
         greeting,
@@ -276,13 +278,19 @@ Quedamos atentos a cualquier inquietud.`;
   return { subject, body };
 }
 
-export function buildBitacoraNotificacionContent(bita, cliente) {
+export function buildBitacoraNotificacionContent(bita, cliente, { incluyeFirma = true } = {}) {
   const subject = `Bitácora de soporte — ${bita.cnssoporte}`;
-  const body = `Hola {{nombre}},
+  const body = incluyeFirma
+    ? `Hola {{nombre}},
 
 Le compartimos el resumen del soporte atendido, con el detalle de la solicitud y la respuesta brindada.
 
-Por favor confirme su conformidad firmando digitalmente mediante el enlace incluido en este correo.
+Por favor confirme su conformidad firmando digitalmente. Al abrir el enlace deberá ingresar su número de documento; solo el funcionario que solicitó el soporte podrá firmar.
+
+Gracias por confiar en nosotros.`
+    : `Hola {{nombre}},
+
+Le compartimos el resumen del soporte atendido, con el detalle de la solicitud y la respuesta brindada (copia informativa).
 
 Gracias por confiar en nosotros.`;
   return { subject, body };
@@ -312,7 +320,7 @@ export async function previewNotificacionBitacora(cnssoporte) {
   const cliente = bita.cliente ? await loadCliente(bita.cliente) : null;
   const funcionario = await loadFuncionarioDestinatario(bita);
   const firmaUrl = createBitacoraFirmaLink(cnssoporte);
-  const bundle = buildBitacoraEmailBundle(bita, cliente, '', { firmaUrl });
+  const bundle = buildBitacoraEmailBundle(bita, cliente, '', { firmaUrl, incluyeFirma: true });
   return {
     subject: bundle.subject,
     body: bundle.body,
@@ -423,7 +431,7 @@ export async function enviarNotificacionBitacora(cnssoporte, body = {}, usuario 
   const ccList = resolveEquipoDestinatarios(cliente, ccEmails);
   const firmaUrl = createBitacoraFirmaLink(cnssoporte);
   const bodyTemplate = String(body.body || '').trim();
-  const bundle = buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl });
+  const bundle = buildBitacoraEmailBundle(bita, cliente, bodyTemplate, { firmaUrl, incluyeFirma: true });
   const subject = String(body.subject || '').trim() || bundle.subject;
 
   return sendActaCapacitacionEmail({

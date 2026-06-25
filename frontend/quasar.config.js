@@ -35,7 +35,7 @@ export default configure(() => {
     },
 
     devServer: {
-      port: 9020,
+      port: Number(process.env.QUASAR_DEV_PORT) || 9020,
       open: true,
       proxy: {
         '/api': {

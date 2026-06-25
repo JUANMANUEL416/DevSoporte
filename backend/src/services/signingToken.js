@@ -68,16 +68,14 @@ export function createRegistroToken(cnscapacita) {
   );
 }
 
-export function createBitacoraFirmaToken({ cnssoporte }) {
+export function createBitacoraFirmaToken({ cnssoporte, documento }) {
   const days = Number(process.env.SIGNING_TOKEN_EXPIRES_DAYS) || 14;
-  return jwt.sign(
-    {
-      scope: 'bitacora_firma',
-      cnssoporte: String(cnssoporte),
-    },
-    SECRET,
-    { expiresIn: `${days}d` },
-  );
+  const payload = {
+    scope: 'bitacora_firma',
+    cnssoporte: String(cnssoporte),
+  };
+  if (documento) payload.documento = String(documento);
+  return jwt.sign(payload, SECRET, { expiresIn: `${days}d` });
 }
 
 export function createActproyFirmaToken({ consecutivo }) {

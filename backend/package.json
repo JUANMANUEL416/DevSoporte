@@ -7,9 +7,13 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "dev:pruebas": "node --env-file=.env.pruebas --watch src/server.js",
+    "start:pruebas": "node --env-file=.env.pruebas src/server.js",
     "db:init": "node src/db/init.js",
     "db:clean": "node src/db/clean.js",
-    "db:semanas": "node src/db/semanas.js"
+    "db:semanas": "node src/db/semanas.js",
+    "db:pruebas:init": "node --env-file=.env.pruebas scripts/pruebas-init.mjs",
+    "db:pruebas:restore": "node --env-file=.env.pruebas scripts/pruebas-restore.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

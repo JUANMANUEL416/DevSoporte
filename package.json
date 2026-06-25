@@ -7,6 +7,10 @@
     "build": "npm run build --prefix frontend",
     "deploy": "powershell -ExecutionPolicy Bypass -File deploy/deploy.ps1",
     "deploy:install": "powershell -ExecutionPolicy Bypass -File deploy/install-service.ps1",
-    "release": "powershell -ExecutionPolicy Bypass -File deploy/release.ps1"
+    "release": "powershell -ExecutionPolicy Bypass -File deploy/release.ps1",
+    "dev:pruebas": "powershell -ExecutionPolicy Bypass -File scripts/dev-pruebas-backend.ps1",
+    "dev:pruebas:front": "powershell -ExecutionPolicy Bypass -File scripts/dev-pruebas-front.ps1",
+    "db:pruebas:init": "npm run db:pruebas:init --prefix backend",
+    "db:pruebas:restore": "npm run db:pruebas:restore --prefix backend"
   }
 }

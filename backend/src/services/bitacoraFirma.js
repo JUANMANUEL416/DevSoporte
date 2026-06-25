@@ -37,6 +37,48 @@ export function createBitacoraFirmaLink(cnssoporte) {
   return buildFirmaUrl(token);
 }
 
+function normalizeDocumento(value) {
+  return String(value || '').trim().replace(/\D/g, '');
+}
+
+export async function documentoAutorizadoFirmar(cnssoporte, documento) {
+  const row = await loadBitacoraFirmaContext(cnssoporte);
+  if (!row) {
+    return { autorizado: false, motivo: 'Registro no encontrado' };
+  }
+  const func = await loadFuncionarioDestinatario(row);
+  if (!func?.documento) {
+    return {
+      autorizado: false,
+      motivo: 'No hay funcionario autorizado configurado para firmar este soporte.',
+    };
+  }
+  const ingresado = normalizeDocumento(documento);
+  const esperado = normalizeDocumento(func.documento);
+  if (!ingresado || ingresado !== esperado) {
+    return {
+      autorizado: false,
+      motivo: 'El documento ingresado no corresponde al funcionario autorizado para firmar.',
+    };
+  }
+  return { autorizado: true, funcionario: func };
+}
+
+export async function validarDocumentoFirmanteBitacora(cnssoporte, documento) {
+  const docCheck = await documentoAutorizadoFirmar(cnssoporte, documento);
+  if (!docCheck.autorizado) {
+    return { valido: false, motivo: docCheck.motivo };
+  }
+  const estado = await getBitacoraFirmaEstado(cnssoporte);
+  if (!estado) {
+    return { valido: false, motivo: 'Registro no encontrado' };
+  }
+  if (!estado.puedeFirmar) {
+    return { valido: false, motivo: estado.bloqueoMotivo || 'No se puede firmar este soporte.' };
+  }
+  return { valido: true };
+}
+
 export async function getBitacoraFirmaEstado(cnssoporte) {
   const row = await loadBitacoraFirmaContext(cnssoporte);
   if (!row) return null;
@@ -58,7 +100,16 @@ export async function getBitacoraFirmaEstado(cnssoporte) {
   return { row, puedeFirmar, bloqueoMotivo };
 }
 
-export async function assertPuedeFirmarBitacora(cnssoporte) {
+export async function assertPuedeFirmarBitacora(cnssoporte, { documentoIngresado } = {}) {
+  if (documentoIngresado !== undefined && documentoIngresado !== null) {
+    const docCheck = await documentoAutorizadoFirmar(cnssoporte, documentoIngresado);
+    if (!docCheck.autorizado) {
+      const err = new Error(docCheck.motivo || 'Documento no autorizado para firmar');
+      err.status = 403;
+      throw err;
+    }
+  }
+
   const estado = await getBitacoraFirmaEstado(cnssoporte);
   if (!estado) {
     const err = new Error('Registro no encontrado');
@@ -73,8 +124,8 @@ export async function assertPuedeFirmarBitacora(cnssoporte) {
   return estado.row;
 }
 
-export async function saveBitacoraFirma(cnssoporte, firma) {
-  await assertPuedeFirmarBitacora(cnssoporte);
+export async function saveBitacoraFirma(cnssoporte, firma, options = {}) {
+  await assertPuedeFirmarBitacora(cnssoporte, options);
   const res = await query(
     `UPDATE bita
      SET firma = $1, firma_fecha = NOW()

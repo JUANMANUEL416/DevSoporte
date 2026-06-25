@@ -17,6 +17,10 @@ export const authApi = {
   me: () => api.get('/auth/me').then((r) => r.data),
 };
 
+export const appApi = {
+  health: () => api.get('/health').then((r) => r.data),
+};
+
 export const dashboardApi = {
   stats: () => api.get('/dashboard/stats').then((r) => r.data),
 };
