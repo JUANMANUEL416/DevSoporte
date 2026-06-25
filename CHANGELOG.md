@@ -2,6 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.1.5] - 2026-06-25
+
+### Agregado
+- Autostart de ngrok con PM2 (`ngrok-devsoporte`) en `npm run deploy` e inicio de producción.
+- Variables `NGROK_AUTOSTART` y `NGROK_DOMAIN` en ejemplos de `.env`.
+
+### Cambiado
+- `start-ngrok.ps1` gestiona el túnel vía PM2 y limpia procesos ngrok huérfanos.
+
 ## [1.1.4] - 2026-06-25
 
 ### Agregado
@@ -39,6 +48,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 ### Agregado
 - Migración inicial Clarion → web (bitácora, capacitaciones, firmas, clientes, catálogos).
 
+[1.1.5]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.0...v1.1.3
 [1.1.0]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.0.0...v1.1.0
