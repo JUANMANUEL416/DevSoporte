@@ -60,7 +60,7 @@ echo [2/4] Servicio PM2 (devsoporte)...
 call pm2 ping >nul 2>&1
 if errorlevel 1 (
   echo       Iniciando PM2 y aplicacion...
-  call pm2 start "%ROOT%deploy\ecosystem.config.cjs" --env production
+  call pm2 start "%ROOT%deploy\ecosystem.config.cjs" --env production --only devsoporte
 ) else (
   call pm2 describe devsoporte >nul 2>&1
   if errorlevel 1 (
@@ -68,7 +68,7 @@ if errorlevel 1 (
     call pm2 resurrect >nul 2>&1
     call pm2 describe devsoporte >nul 2>&1
     if errorlevel 1 (
-      call pm2 start "%ROOT%deploy\ecosystem.config.cjs" --env production
+      call pm2 start "%ROOT%deploy\ecosystem.config.cjs" --env production --only devsoporte
     )
   ) else (
     echo       Reiniciando devsoporte...
@@ -94,7 +94,7 @@ goto espera_api
 echo       OK - API activa.
 
 echo.
-echo [3/4] Tunel ngrok...
+echo [3/4] Tunel ngrok (PM2)...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%deploy\start-ngrok.ps1" -Domain "%NGROK_DOMAIN%"
 if errorlevel 1 (
   echo [ERROR] No se pudo iniciar ngrok.
@@ -117,6 +117,7 @@ echo.
 echo   Comandos utiles:
 echo     pm2 status
 echo     pm2 logs devsoporte
+echo     pm2 logs ngrok-devsoporte
 echo.
 goto :fin_ok
 

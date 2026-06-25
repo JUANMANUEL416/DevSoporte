@@ -19,6 +19,33 @@ function Write-Step($msg) {
   Write-Host "`n==> $msg" -ForegroundColor Cyan
 }
 
+function Get-BackendEnvValue([string]$Key) {
+  $envFile = Join-Path $Root 'backend\.env'
+  if (-not (Test-Path $envFile)) { return $null }
+  foreach ($line in Get-Content $envFile -Encoding UTF8) {
+    if ($line -match "^\s*$([regex]::Escape($Key))\s*=\s*(.+)\s*$") {
+      return $Matches[1].Trim().Trim('"').Trim("'")
+    }
+  }
+  return $null
+}
+
+function Test-NgrokAutostartEnabled {
+  $flag = Get-BackendEnvValue 'NGROK_AUTOSTART'
+  if (-not $flag) { return $true }
+  return @('1', 'true', 'yes', 'si', 'sí') -contains $flag.ToLower()
+}
+
+function Sync-NgrokEnvFromBackend {
+  $domain = Get-BackendEnvValue 'NGROK_DOMAIN'
+  if (-not $domain) {
+    $publicUrl = Get-BackendEnvValue 'PUBLIC_APP_URL'
+    if ($publicUrl -match '^https?://([^/]+)') { $domain = $Matches[1] }
+  }
+  if ($domain) { $env:NGROK_DOMAIN = $domain }
+  $env:NGROK_PORT = '3300'
+}
+
 Write-Step "DevSoporte - despliegue produccion"
 $branch = git rev-parse --abbrev-ref HEAD
 if ($branch -ne 'master') {
@@ -81,18 +108,44 @@ if (-not $pm2) {
   npm install -g pm2
 }
 
+Sync-NgrokEnvFromBackend
 $env:NODE_ENV = 'production'
-pm2 start (Join-Path $Root 'deploy\ecosystem.config.cjs') --env production --update-env
+$ecosystem = Join-Path $Root 'deploy\ecosystem.config.cjs'
+pm2 start $ecosystem --env production --only devsoporte --update-env
+
+if (Test-NgrokAutostartEnabled) {
+  if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
+    Write-Host "AVISO: ngrok no encontrado en PATH; tunel no iniciado." -ForegroundColor Yellow
+    pm2 delete ngrok-devsoporte 2>$null | Out-Null
+  } else {
+    Write-Step "PM2 - tunel ngrok"
+    pm2 stop ngrok-devsoporte 2>$null | Out-Null
+    Get-Process ngrok -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+    pm2 start $ecosystem --env production --only ngrok-devsoporte --update-env
+  }
+} else {
+  Write-Host "NGROK_AUTOSTART=false en backend\.env — tunel ngrok omitido." -ForegroundColor DarkGray
+  pm2 delete ngrok-devsoporte 2>$null | Out-Null
+}
+
 pm2 save
 
 Write-Step "Estado del servicio"
-pm2 status devsoporte
-pm2 logs devsoporte --lines 15 --nostream
+pm2 status
+pm2 logs devsoporte --lines 10 --nostream
+if (Test-NgrokAutostartEnabled -and (Get-Command ngrok -ErrorAction SilentlyContinue)) {
+  pm2 logs ngrok-devsoporte --lines 8 --nostream
+}
 
 Write-Host "`nDespliegue completado." -ForegroundColor Green
 Write-Host "URL local: http://localhost:3300"
 Write-Host "Health:    http://localhost:3300/api/health"
+$publicUrl = Get-BackendEnvValue 'PUBLIC_APP_URL'
+if ($publicUrl) {
+  Write-Host "Publico:   $publicUrl (via ngrok + PM2)"
+}
+Write-Host "`nTunel ngrok: pm2 status ngrok-devsoporte  |  pm2 logs ngrok-devsoporte"
+Write-Host "Desactivar auto-ngrok: NGROK_AUTOSTART=false en backend\.env"
 Write-Host "`nPara arranque automático al iniciar Windows (ejecutar una vez como Administrador):"
-Write-Host "  npm install -g pm2-windows-startup"
-Write-Host "  pm2-startup install"
-Write-Host "  pm2 save"
+Write-Host "  npm run deploy:install"
