@@ -36,7 +36,8 @@ export default configure(() => {
 
     devServer: {
       port: Number(process.env.QUASAR_DEV_PORT) || 9020,
-      open: true,
+      strictPort: Boolean(process.env.QUASAR_DEV_PORT),
+      open: process.env.QUASAR_DEV_PORT ? false : true,
       proxy: {
         '/api': {
           target: process.env.BACKEND_URL || 'http://localhost:3300',

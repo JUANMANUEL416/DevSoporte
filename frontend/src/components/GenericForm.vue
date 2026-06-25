@@ -208,7 +208,10 @@ const pkFields = computed(() => {
 
 const visibleFields = computed(() =>
   props.module.fields.filter(
-    (f) => !f.hidden && !(f.hideOnCreate && !props.isEdit),
+    (f) =>
+      !f.hidden
+      && !(f.hideOnCreate && !props.isEdit)
+      && !(f.hideOnEdit && props.isEdit),
   ),
 );
 
@@ -228,9 +231,14 @@ function lookupParams(f) {
 }
 
 function onLookupPick(f, row) {
-  if (!f.fillFrom || !row) return;
-  for (const [target, source] of Object.entries(f.fillFrom)) {
-    form.value[target] = row[source] ?? '';
+  if (!row) return;
+  if (f.fillFrom) {
+    for (const [target, source] of Object.entries(f.fillFrom)) {
+      form.value[target] = row[source] ?? '';
+    }
+    if (f.fillFrom.liderproyecto) {
+      $q.notify({ type: 'positive', message: 'Equipo de trabajo copiado' });
+    }
   }
 }
 
@@ -377,6 +385,9 @@ async function save() {
     const api = useResource(props.module.resource);
     const payload = { ...form.value };
     for (const f of props.module.fields) {
+      if (f.uiOnly || String(f.name || '').startsWith('_')) {
+        delete payload[f.name];
+      }
       if (f.type === 'password' && !String(payload[f.name] || '').trim()) {
         delete payload[f.name];
       }

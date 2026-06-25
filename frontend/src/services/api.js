@@ -28,6 +28,10 @@ export const dashboardApi = {
 export const clientesApi = {
   destinatarios: (codigo, params = {}) =>
     api.get(`/clientes/${encodeURIComponent(codigo)}/destinatarios-notificacion`, { params }).then((r) => r.data),
+  copiarEquipoTrabajo: (codigo, origen) =>
+    api
+      .post(`/clientes/${encodeURIComponent(codigo)}/copiar-equipo-trabajo`, { origen })
+      .then((r) => r.data),
 };
 
 export const capacitacionesApi = {

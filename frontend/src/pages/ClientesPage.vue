@@ -91,6 +91,9 @@
                 <q-btn flat dense round icon="edit" color="primary" @click="openCliEdit(props.row)">
                   <q-tooltip>Editar</q-tooltip>
                 </q-btn>
+                <q-btn flat dense round icon="content_copy" color="teal" @click="openCopiarEquipo(props.row)">
+                  <q-tooltip>Copiar equipo de trabajo</q-tooltip>
+                </q-btn>
                 <q-btn flat dense round icon="delete" color="negative" @click="confirmCliDelete(props.row)">
                   <q-tooltip>Eliminar</q-tooltip>
                 </q-btn>
@@ -212,15 +215,48 @@
       :is-edit="funcIsEdit"
       @saved="onFuncSaved"
     />
+
+    <q-dialog v-model="copiarEquipoOpen" persistent>
+      <q-card style="min-width: 420px; max-width: 95vw">
+        <q-card-section>
+          <div class="text-h6">Copiar equipo de trabajo</div>
+          <div class="text-caption text-grey q-mt-xs">
+            Cliente destino: <strong>{{ copiarEquipoDestino?.codigo }}</strong>
+            · {{ copiarEquipoDestino?.nombrecliente }}
+          </div>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <LookupSelect
+            v-model="copiarEquipoOrigen"
+            resource="clientes"
+            value-field="codigo"
+            label-field="nombrecliente"
+            label="Copiar desde cliente"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" v-close-popup />
+          <q-btn
+            unelevated
+            color="primary"
+            label="Copiar"
+            :loading="copiandoEquipo"
+            :disable="!copiarEquipoOrigen"
+            @click="confirmCopiarEquipo"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
-import { useResource } from 'src/services/api';
+import { useResource, clientesApi } from 'src/services/api';
 import { findModule } from 'src/config/modules';
 import GenericForm from 'components/GenericForm.vue';
+import LookupSelect from 'components/LookupSelect.vue';
 
 const $q = useQuasar();
 const cliApi = useResource('clientes');
@@ -241,7 +277,7 @@ const funcModule = computed(() => ({
 
 const cliColumns = computed(() => [
   { name: 'expand', label: '', field: 'expand', align: 'left', style: 'width: 40px' },
-  { name: 'acciones', label: '', field: 'acciones', align: 'left', style: 'width: 88px' },
+  { name: 'acciones', label: '', field: 'acciones', align: 'left', style: 'width: 120px' },
   ...mod.columns,
 ]);
 const funcColumns = computed(() => [
@@ -264,6 +300,11 @@ const cliIsEdit = ref(false);
 const funcIsEdit = ref(false);
 const cliCurrent = ref({});
 const funcCurrent = ref({});
+
+const copiarEquipoOpen = ref(false);
+const copiarEquipoDestino = ref(null);
+const copiarEquipoOrigen = ref('');
+const copiandoEquipo = ref(false);
 
 const currentFuncRows = computed(() =>
   expandedCodigo.value ? getFuncRows(expandedCodigo.value) : [],
@@ -390,6 +431,30 @@ function confirmCliDelete(row) {
 function onCliSaved() {
   formCliOpen.value = false;
   loadClientes();
+}
+
+function openCopiarEquipo(row) {
+  copiarEquipoDestino.value = row;
+  copiarEquipoOrigen.value = '';
+  copiarEquipoOpen.value = true;
+}
+
+async function confirmCopiarEquipo() {
+  if (!copiarEquipoDestino.value?.codigo || !copiarEquipoOrigen.value) return;
+  copiandoEquipo.value = true;
+  try {
+    await clientesApi.copiarEquipoTrabajo(copiarEquipoDestino.value.codigo, copiarEquipoOrigen.value);
+    $q.notify({ type: 'positive', message: 'Equipo de trabajo copiado' });
+    copiarEquipoOpen.value = false;
+    loadClientes();
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudo copiar el equipo de trabajo',
+    });
+  } finally {
+    copiandoEquipo.value = false;
+  }
 }
 
 function openFuncCreate(cliente) {
@@ -588,7 +653,7 @@ onMounted(loadClientes);
 }
 
 .clientes-table__actions-cell {
-  width: 88px;
+  width: 120px;
   padding-right: 4px !important;
 }
 

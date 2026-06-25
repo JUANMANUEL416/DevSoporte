@@ -25,6 +25,7 @@ import {
 } from './services/notificacionEmail.js';
 import { previewBitacoraHandler, previewCapacitacionHandler } from './routes/notificacionPreview.js';
 import destinatariosHandler from './routes/clienteNotificaciones.js';
+import clienteEquipoRoutes from './routes/clienteEquipo.js';
 import { cambiarEstadoHandler, estadoOpcionesHandler } from './routes/capacitacionEstado.js';
 import { capacitacionPdfHandler } from './routes/capacitacionPdf.js';
 import {
@@ -201,6 +202,7 @@ app.get('/api/entities', requireAuth, (req, res) => {
 });
 
 app.get('/api/clientes/:codigo/destinatarios-notificacion', requireAuth, destinatariosHandler);
+app.use('/api/clientes', requireAuth, clienteEquipoRoutes);
 app.get('/api/capacitaciones/:id/estado-opciones', requireAuth, estadoOpcionesHandler);
 app.post('/api/capacitaciones/:id/cambiar-estado', requireAuth, cambiarEstadoHandler);
 app.get('/api/capacitaciones/:id/preview-notificacion', requireAuth, previewCapacitacionHandler);

@@ -24,6 +24,11 @@ export const entities = {
     search: ['codigo', 'nombrecliente', 'ciudad', 'email'],
     orderBy: 'nombrecliente',
     label: 'Clientes',
+    autoConsecutivo: {
+      field: 'codigo',
+      acnsPrefijo: 'CLIE',
+      pad: 3,
+    },
   },
   funcionarios: {
     table: 'clief',
