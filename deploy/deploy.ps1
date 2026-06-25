@@ -125,7 +125,7 @@ if (Test-NgrokAutostartEnabled) {
     pm2 start $ecosystem --env production --only ngrok-devsoporte --update-env
   }
 } else {
-  Write-Host "NGROK_AUTOSTART=false en backend\.env — tunel ngrok omitido." -ForegroundColor DarkGray
+  Write-Host 'NGROK_AUTOSTART=false en backend\.env - tunel ngrok omitido.' -ForegroundColor DarkGray
   pm2 delete ngrok-devsoporte 2>$null | Out-Null
 }
 
@@ -147,5 +147,5 @@ if ($publicUrl) {
 }
 Write-Host "`nTunel ngrok: pm2 status ngrok-devsoporte  |  pm2 logs ngrok-devsoporte"
 Write-Host "Desactivar auto-ngrok: NGROK_AUTOSTART=false en backend\.env"
-Write-Host "`nPara arranque automático al iniciar Windows (ejecutar una vez como Administrador):"
+Write-Host "`nPara arranque automatico al iniciar Windows (ejecutar una vez como Administrador):"
 Write-Host "  npm run deploy:install"
