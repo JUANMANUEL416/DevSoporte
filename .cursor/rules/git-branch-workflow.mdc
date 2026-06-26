@@ -1,26 +1,59 @@
 ---
-description: Flujo Git DevSoporte — master publica, develop integra, cambios solo en ramas feature/fix
+description: Flujo Git DevSoporte — ramas desde develop, pruebas primero, release y deploy solo desde master
 alwaysApply: true
 ---
 
-# Ramas Git — DevSoporte
+# Ramas Git y entornos — DevSoporte
 
 ## Ramas fijas
 
 | Rama | Uso |
 |------|-----|
-| `master` | **Producción.** Solo recibe merges probados. Aquí se compila y despliega (`npm run deploy`, PM2). |
-| `develop` | **Integración.** Base para todo desarrollo. No desplegar directamente a producción. |
+| `master` | **Producción.** Solo merges validados en pruebas. Aquí se hace `release` y `deploy`. |
+| `develop` | **Integración.** Base de todo desarrollo. Merge de ramas feature/fix. |
 
 ## Reglas obligatorias
 
-1. **No commitear en `master` ni `develop`** salvo merges integrados y releases versionados.
-2. **Todo cambio de código** se hace en ramas derivadas de `develop`:
+1. **Todo cambio de código** se hace en una rama creada desde `develop`:
    - `feature/nombre-corto` — funcionalidad nueva
    - `fix/nombre-corto` — corrección
-3. Flujo: `develop` → crear rama → commits → merge a `develop` → probar → merge `develop` → `master` → `npm run deploy`.
-4. **`npm run deploy` y `npm run release` solo desde `master`.**
-5. Tras cambios en `frontend/`, compilar antes de desplegar (`npm run build` incluido en deploy).
+2. **No commitear en `master` ni `develop`** salvo merges y commits de release versionados.
+3. **Pruebas siempre antes de producción.** Validar en entorno de pruebas; no pasar a `master` sin esa verificación.
+4. **`npm run release` y `npm run deploy` solo desde `master`.**
+5. **Versión y control de cambios** (`VERSION`, `CHANGELOG.md`, `devver`, `devcamb`, tag Git) **solo en release desde `master`**, nunca en ramas de desarrollo ni en deploy sin release previo.
+
+## Flujo completo
+
+```
+develop → rama feature/fix → commits
+       → merge a develop
+       → probar en PRUEBAS
+       → (decisión) merge develop → master
+       → npm run release    ← publica versión y avances
+       → npm run deploy     ← build + PM2 producción
+```
+
+## Entorno de pruebas (obligatorio antes de producción)
+
+| Componente | Pruebas | Producción |
+|------------|---------|------------|
+| API | `:3301` (`npm run dev:pruebas`) | `:3300` (PM2) |
+| UI | `:9021` (`npm run dev:pruebas:front`) | SPA compilado en PM2 |
+| BD | `devsoporte_pruebas` (`.env.pruebas`) | `devsoporte` (`.env`) |
+
+Migraciones en pruebas:
+
+```powershell
+cd backend
+node --env-file=.env.pruebas scripts/apply-migration.mjs src/db/migrations/NNN_archivo.sql
+```
+
+## Control de versiones (devcamb / devver)
+
+1. Al iniciar un cambio: registrar en **Control de Versiones** (estado `en_desarrollo`).
+2. Tras merge a `develop`: marcar **integrado** con resumen de cambios.
+3. Tras merge a `master`: ejecutar **`npm run release`** (publica integrados, actualiza `VERSION`, tag Git).
+4. Luego **`npm run deploy`**. Si hay integrados sin publicar, el deploy avisa — no desplegar sin release.
 
 ## Comandos habituales
 
@@ -29,22 +62,27 @@ git checkout develop
 git pull origin develop
 git checkout -b feature/mi-cambio
 
-# al terminar:
+# desarrollo y pruebas
+npm run dev:pruebas          # API :3301
+npm run dev:pruebas:front    # UI  :9021
+
 git checkout develop
 git merge feature/mi-cambio
 git push origin develop
 
-# publicar:
+# cuando se aprueba pasar a producción:
 git checkout master
 git pull origin master
 git merge develop
 git push origin master
+npm run release
 npm run deploy
 ```
 
 ## Para el agente
 
-- Antes de editar código, verificar rama actual (`git branch --show-current`).
-- Si está en `master` o `develop`, crear o cambiar a una rama `feature/*` o `fix/*` desde `develop` antes de implementar.
-- No ejecutar deploy/release fuera de `master`.
-- Avisar al usuario si pide desplegar desde otra rama.
+- Antes de editar código: `git branch --show-current`. Si está en `master` o `develop`, crear o cambiar a `feature/*` o `fix/*` desde `develop`.
+- Probar cambios con backend/frontend de **pruebas** antes de proponer merge a `master`.
+- No ejecutar `deploy` ni `release` fuera de `master`.
+- No modificar `VERSION` ni `CHANGELOG.md` en ramas de feature/fix; eso corresponde al release en `master`.
+- Avisar al usuario si pide desplegar o publicar versión sin haber pasado por pruebas o sin estar en `master`.

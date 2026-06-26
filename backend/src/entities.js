@@ -245,7 +245,7 @@ export const entities = {
     pk: ['codigo'],
     columns: ['codigo', 'nombre', 'estado', 'observacion', 'dirigidoa'],
     search: ['codigo', 'nombre'],
-    orderBy: 'nombre',
+    orderBy: 'codigo',
     label: 'Temas de Capacitación',
     autoConsecutivo: {
       field: 'codigo',

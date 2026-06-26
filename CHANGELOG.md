@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.1] - 2026-06-26
+
+### Cambiado
+- **Temas de capacitación:** listado ordenado por código de tema.
+- **Cronograma:** temas expandibles/colapsables en el detalle; orden por fecha probable ascendente.
+- **PDF cronograma:** temas ordenados por fecha probable ascendente.
+
 ## [1.2.0] - 2026-06-26
 
 ### Agregado
@@ -60,6 +67,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 ### Agregado
 - Migración inicial Clarion → web (bitácora, capacitaciones, firmas, clientes, catálogos).
 
+[1.2.1]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.3...v1.1.4

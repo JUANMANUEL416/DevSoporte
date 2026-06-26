@@ -290,27 +290,56 @@ function drawHeader(doc, L, enc) {
   return outerY + outerH + HEADER_TEMA_GAP;
 }
 
+function parseProbableDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.getTime();
+}
+
+function temaFechaProbableSortKey(items) {
+  const stamps = items.map((i) => parseProbableDate(i.fecha_probable)).filter((d) => d != null);
+  if (!stamps.length) return Number.MAX_SAFE_INTEGER;
+  return Math.min(...stamps);
+}
+
+function sortGruposByFechaProbable(grupos) {
+  return grupos.sort((a, b) => {
+    const diff = temaFechaProbableSortKey(a.items) - temaFechaProbableSortKey(b.items);
+    if (diff !== 0) return diff;
+    return (a.tema_codigo || a.tema_nombre || '').localeCompare(
+      b.tema_codigo || b.tema_nombre || '',
+      'es',
+    );
+  });
+}
+
 function groupByTema(items) {
   const map = new Map();
   for (const item of items) {
     const key = item.tema_codigo || item.tema_nombre || '_';
     if (!map.has(key)) {
-      map.set(key, { tema_nombre: item.tema_nombre || 'Sin tema', items: [] });
+      map.set(key, {
+        tema_codigo: item.tema_codigo,
+        tema_nombre: item.tema_nombre || 'Sin tema',
+        items: [],
+      });
     }
     map.get(key).items.push(item);
   }
-  return Array.from(map.values()).map((g) => ({
+  const grupos = Array.from(map.values()).map((g) => ({
     ...g,
     items: g.items.sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0)),
     fecha_probable: temaFechaProbable(g.items),
     dirigidoa: g.items[0]?.dirigidoa || '',
   }));
+  return sortGruposByFechaProbable(grupos);
 }
 
 function temaFechaProbable(items) {
   const dates = items.map((i) => i.fecha_probable).filter(Boolean);
   if (!dates.length) return '—';
-  return fmtDate(dates[0]);
+  const sorted = [...dates].sort((a, b) => parseProbableDate(a) - parseProbableDate(b));
+  return fmtDate(sorted[0]);
 }
 
 const SEGUIMIENTO_FIXED_COLS_W = 450 + 550 + 850 + 758;
@@ -554,7 +583,7 @@ export async function fetchCronograma(cnscrono) {
   const items = await query(
     `SELECT * FROM cronocapd
      WHERE cnscrono = $1
-     ORDER BY tema_nombre, item`,
+     ORDER BY fecha_probable NULLS LAST, tema_codigo, item`,
     [cnscrono],
   );
 

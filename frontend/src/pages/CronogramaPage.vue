@@ -169,10 +169,26 @@
                 <template v-if="getTemaGroups(props.row.cnscrono).length">
                   <section
                     v-for="grupo in getTemaGroups(props.row.cnscrono)"
-                    :key="grupo.tema_codigo || grupo.tema_nombre"
+                    :key="temaGroupKey(props.row.cnscrono, grupo)"
                     class="tema-group"
+                    :class="{ 'tema-group--collapsed': !isTemaExpanded(props.row.cnscrono, grupo) }"
                   >
-                    <header class="tema-group__header">
+                    <header
+                      class="tema-group__header"
+                      role="button"
+                      tabindex="0"
+                      @click="toggleTemaExpand(props.row.cnscrono, grupo)"
+                      @keydown.enter.space.prevent="toggleTemaExpand(props.row.cnscrono, grupo)"
+                    >
+                      <q-btn
+                        flat
+                        dense
+                        round
+                        size="sm"
+                        :icon="isTemaExpanded(props.row.cnscrono, grupo) ? 'expand_less' : 'expand_more'"
+                        color="primary"
+                        @click.stop="toggleTemaExpand(props.row.cnscrono, grupo)"
+                      />
                       <q-icon name="menu_book" size="16px" class="q-mr-xs" />
                       <div class="tema-group__main">
                         <strong class="tema-group__title">{{ grupo.tema_nombre }}</strong>
@@ -210,6 +226,7 @@
                       </div>
                     </header>
                     <q-table
+                      v-show="isTemaExpanded(props.row.cnscrono, grupo)"
                       class="items-table"
                       :rows="grupo.items"
                       :columns="itemColumns"
@@ -594,6 +611,7 @@ const itemLoading = ref({});
 const loadingCrono = ref(false);
 const searchCrono = ref('');
 const expandedCnscrono = ref(null);
+const expandedTemas = ref({});
 const pagCrono = ref({ page: 1, rowsPerPage: 10, rowsNumber: 0 });
 
 const formCronoOpen = ref(false);
@@ -714,6 +732,34 @@ function isItemLoading(cnscrono) {
   return !!itemLoading.value[cnscrono];
 }
 
+function parseProbableDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.getTime();
+}
+
+function temaFechaProbableSortKey(items) {
+  const stamps = items.map((i) => parseProbableDate(i.fecha_probable)).filter((d) => d != null);
+  if (!stamps.length) return Number.MAX_SAFE_INTEGER;
+  return Math.min(...stamps);
+}
+
+function temaGroupKey(cnscrono, grupo) {
+  return `${cnscrono}:${grupo.tema_codigo || grupo.tema_nombre || '_'}`;
+}
+
+function isTemaExpanded(cnscrono, grupo) {
+  return expandedTemas.value[temaGroupKey(cnscrono, grupo)] !== false;
+}
+
+function toggleTemaExpand(cnscrono, grupo) {
+  const key = temaGroupKey(cnscrono, grupo);
+  expandedTemas.value = {
+    ...expandedTemas.value,
+    [key]: !isTemaExpanded(cnscrono, grupo),
+  };
+}
+
 function groupByTema(rows) {
   const map = new Map();
   for (const row of rows) {
@@ -733,7 +779,14 @@ function groupByTema(rows) {
       dirigidoa: g.items[0]?.dirigidoa || '',
       items: g.items.sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0)),
     }))
-    .sort((a, b) => (a.tema_nombre || '').localeCompare(b.tema_nombre || '', 'es'));
+    .sort((a, b) => {
+      const diff = temaFechaProbableSortKey(a.items) - temaFechaProbableSortKey(b.items);
+      if (diff !== 0) return diff;
+      return (a.tema_codigo || a.tema_nombre || '').localeCompare(
+        b.tema_codigo || b.tema_nombre || '',
+        'es',
+      );
+    });
 }
 
 function getTemaGroups(cnscrono) {
@@ -1294,6 +1347,10 @@ onMounted(() => {
   &:last-child {
     margin-bottom: 0;
   }
+
+  &--collapsed .tema-group__header {
+    margin-bottom: 0;
+  }
 }
 
 .tema-group__header {
@@ -1306,6 +1363,12 @@ onMounted(() => {
   background: #e3f2fd;
   color: #0d47a1;
   font-size: 0.82rem;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background: #bbdefb;
+  }
 }
 
 .tema-group__main {
