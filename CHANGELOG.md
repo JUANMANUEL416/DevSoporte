@@ -2,6 +2,20 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.2] - 2026-06-26
+
+### Agregado
+- **Hora sugerida** al agregar temas al cronograma (campo HH:MM en ítems y PDF).
+- **Duplicar cronograma** para capacitaciones de refuerzo (copia en Borrador).
+- Filtro de cronogramas por **fecha de inicio** (Desde/Hasta), mes actual por defecto.
+
+### Cambiado
+- Cronogramas ordenados por **consecutivo** (`cnscrono`).
+- PDF cronograma: columna unificada **Fecha y hora sugerida**.
+- Correo de cronograma: fechas **sin hora** (solo día).
+- Layout cronograma: mejor uso del ancho; botones duplicar/editar en la misma fila.
+- PDF bitácora: más espacio entre registros y entre texto y líneas verticales.
+
 ## [1.2.1] - 2026-06-26
 
 ### Cambiado
@@ -67,6 +81,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 ### Agregado
 - Migración inicial Clarion → web (bitácora, capacitaciones, firmas, clientes, catálogos).
 
+[1.2.2]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.4...v1.1.5

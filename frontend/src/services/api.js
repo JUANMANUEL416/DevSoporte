@@ -119,6 +119,8 @@ export const cronogramaApi = {
     }),
   agregarTema: (id, payload) =>
     api.post(`/cronograma/${encodeURIComponent(id)}/agregar-tema`, payload).then((r) => r.data),
+  duplicar: (id, payload = {}) =>
+    api.post(`/cronograma/${encodeURIComponent(id)}/duplicar`, payload).then((r) => r.data),
   cambiarEstadoItem: (id, item, payload) =>
     api
       .post(`/cronograma/${encodeURIComponent(id)}/items/${encodeURIComponent(item)}/cambiar-estado`, payload)

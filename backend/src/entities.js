@@ -268,7 +268,7 @@ export const entities = {
     pk: ['cnscrono'],
     columns: ['cnscrono', 'cliente', 'fecha', 'fecha_inicial', 'fecha_final', 'descripcion', 'estado', 'observacion', 'usuario'],
     search: ['cnscrono', 'descripcion', 'cliente'],
-    orderBy: 'fecha DESC',
+    orderBy: 'cnscrono ASC',
     label: 'Cronograma de Capacitaciones',
     autoConsecutivo: {
       field: 'cnscrono',
@@ -279,6 +279,10 @@ export const entities = {
     listFrom: 'cronocap c LEFT JOIN clie cl ON cl.codigo = c.cliente',
     listSelect: 'c.cnscrono, c.cliente, c.fecha, c.fecha_inicial, c.fecha_final, c.descripcion, c.estado, c.observacion, c.usuario, cl.nombrecliente',
     listSearch: ['c.cnscrono', 'c.descripcion', 'c.cliente', 'cl.nombrecliente'],
+    listDateFilters: {
+      fechaini: { column: 'c.fecha_inicial', op: 'column_gte' },
+      fechafin: { column: 'c.fecha_inicial', op: 'column_lte' },
+    },
     tableAlias: 'c',
   },
   cronograma_items: {
@@ -286,7 +290,7 @@ export const entities = {
     pk: ['cnscrono', 'item'],
     columns: [
       'cnscrono', 'item', 'tema_codigo', 'tema_nombre', 'descripcion', 'duracion', 'dirigidoa',
-      'fecha_probable', 'estado', 'fecha_real', 'observacion',
+      'fecha_probable', 'hora_sugerida', 'estado', 'fecha_real', 'observacion',
     ],
     search: ['tema_nombre', 'descripcion', 'dirigidoa'],
     orderBy: 'item',
