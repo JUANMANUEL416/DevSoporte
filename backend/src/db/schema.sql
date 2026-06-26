@@ -443,8 +443,12 @@ CREATE TABLE IF NOT EXISTS rasist (
     compromiso1 VARCHAR(200),
     compromiso2 VARCHAR(200),
     registro_token TEXT,
-    estado       VARCHAR(20) DEFAULT 'Abierta'
+    estado       VARCHAR(20) DEFAULT 'Abierta',
+    cnscrono     VARCHAR(20),
+    tema_codigo  VARCHAR(20)
 );
+CREATE INDEX IF NOT EXISTS rasist_cnscrono ON rasist (cnscrono);
+CREATE INDEX IF NOT EXISTS rasist_cnscrono_tema ON rasist (cnscrono, tema_codigo);
 
 -- ----------------------------------------------------------------------------
 -- Asistentes a Capacitaciones (RASISTD)
@@ -569,3 +573,77 @@ CREATE INDEX IF NOT EXISTS devcamb_estado ON devcamb (estado, f_inicio DESC);
 CREATE INDEX IF NOT EXISTS devcamb_version ON devcamb (version);
 CREATE INDEX IF NOT EXISTS devver_fecha ON devver (fecha DESC);
 
+-- ----------------------------------------------------------------------------
+-- Temas de capacitación (catálogo) y cronograma por cliente
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS captema (
+    codigo      VARCHAR(20) PRIMARY KEY,
+    nombre      VARCHAR(120) NOT NULL,
+    estado      VARCHAR(1) DEFAULT 'A',
+    observacion VARCHAR(500),
+    dirigidoa   VARCHAR(500)
+);
+CREATE INDEX IF NOT EXISTS captema_nombre ON captema (nombre);
+
+CREATE TABLE IF NOT EXISTS captemad (
+    codigo      VARCHAR(20) NOT NULL,
+    item        SMALLINT NOT NULL,
+    descripcion VARCHAR(500) NOT NULL,
+    duracion    SMALLINT,
+    estado      VARCHAR(1) DEFAULT 'A',
+    PRIMARY KEY (codigo, item)
+);
+CREATE INDEX IF NOT EXISTS captemad_codigo ON captemad (codigo);
+
+DO $$ BEGIN
+  ALTER TABLE captemad
+    ADD CONSTRAINT fk_captemad_captema
+    FOREIGN KEY (codigo) REFERENCES captema(codigo) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS cronocap (
+    cnscrono    VARCHAR(20) PRIMARY KEY,
+    cliente     VARCHAR(20) NOT NULL,
+    fecha       DATE DEFAULT CURRENT_DATE,
+    fecha_inicial DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_final   DATE NOT NULL DEFAULT CURRENT_DATE,
+    descripcion VARCHAR(500),
+    estado      VARCHAR(20) DEFAULT 'Borrador',
+    observacion VARCHAR(1000),
+    usuario     VARCHAR(50)
+);
+CREATE INDEX IF NOT EXISTS cronocap_cliente ON cronocap (cliente);
+CREATE INDEX IF NOT EXISTS cronocap_fecha ON cronocap (fecha DESC);
+CREATE INDEX IF NOT EXISTS cronocap_fecha_inicial ON cronocap (fecha_inicial DESC);
+
+DO $$ BEGIN
+  ALTER TABLE cronocap
+    ADD CONSTRAINT fk_cronocap_clie
+    FOREIGN KEY (cliente) REFERENCES clie(codigo);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS cronocapd (
+    cnscrono        VARCHAR(20) NOT NULL,
+    item            SMALLINT NOT NULL,
+    tema_codigo     VARCHAR(20) NOT NULL,
+    tema_nombre     VARCHAR(120) NOT NULL,
+    descripcion     VARCHAR(500) NOT NULL,
+    duracion        SMALLINT,
+    dirigidoa       VARCHAR(500),
+    fecha_probable  DATE,
+    estado          VARCHAR(20) DEFAULT 'Programado',
+    fecha_real      DATE,
+    observacion     VARCHAR(1000),
+    PRIMARY KEY (cnscrono, item)
+);
+CREATE INDEX IF NOT EXISTS cronocapd_cnscrono ON cronocapd (cnscrono);
+CREATE INDEX IF NOT EXISTS cronocapd_tema ON cronocapd (tema_codigo);
+
+DO $$ BEGIN
+  ALTER TABLE cronocapd
+    ADD CONSTRAINT fk_cronocapd_cronocap
+    FOREIGN KEY (cnscrono) REFERENCES cronocap(cnscrono) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

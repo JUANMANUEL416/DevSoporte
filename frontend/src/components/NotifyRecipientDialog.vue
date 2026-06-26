@@ -19,6 +19,26 @@
         <q-inner-loading :showing="loading" />
 
         <template v-if="!loading">
+          <section v-if="isCronogramaMode" class="notify-dialog__section">
+            <div class="notify-dialog__section-head">
+              <span class="notify-dialog__section-title">Tipo de PDF adjunto</span>
+            </div>
+            <q-option-group
+              v-model="cronogramaTipo"
+              :options="cronogramaTipoOptions"
+              color="primary"
+              inline
+              dense
+              @update:model-value="reloadCronogramaPreview"
+            />
+            <q-checkbox
+              v-if="cronogramaTipo === 'seguimiento'"
+              v-model="conSoportes"
+              class="q-mt-sm"
+              label="Con soportes (adjuntar actas de capacitación cerradas)"
+            />
+          </section>
+
           <template v-if="isSplitRecipientsMode">
             <div class="notify-dialog__recipients-split">
               <section
@@ -348,12 +368,23 @@ const open = computed({
 });
 
 const isActaMode = computed(() => props.notifyType === 'capacitacion');
+const isCronogramaMode = computed(() => props.notifyType === 'cronograma');
 const isBitacoraMode = computed(() => props.notifyType === 'bitacora');
 const isSemanaReportMode = computed(() => props.notifyType === 'bitacora_semana');
 const isActproyMode = computed(() => props.notifyType === 'actproy');
 const isSplitRecipientsMode = computed(() =>
-  isActaMode.value || isBitacoraMode.value || isSemanaReportMode.value || isActproyMode.value,
+  isActaMode.value
+  || isCronogramaMode.value
+  || isBitacoraMode.value
+  || isSemanaReportMode.value
+  || isActproyMode.value,
 );
+const cronogramaTipo = ref('programacion');
+const conSoportes = ref(false);
+const cronogramaTipoOptions = [
+  { label: 'Programación', value: 'programacion' },
+  { label: 'Seguimiento', value: 'seguimiento' },
+];
 const isEquipoOnlyMode = computed(() => isSemanaReportMode.value);
 
 const allContactos = computed(() => [...contactos.value, ...manualContactos.value]);
@@ -373,6 +404,21 @@ const canSend = computed(() => {
 const previewSample = computed(() => {
   const nombre = previewNombre.value;
   const body = bodyText.value.replace(/\{\{nombre\}\}/g, nombre);
+  if (isCronogramaMode.value) {
+    const para = allContactosTo.value
+      .filter((c) => selectedTo.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(sin destinatarios)';
+    const copia = [...contactosCc.value, ...manualContactosCc.value]
+      .filter((c) => selectedCc.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(ninguno)';
+    const tipoLabel = cronogramaTipo.value === 'seguimiento' ? 'seguimiento' : 'programación';
+    const soportesNote = cronogramaTipo.value === 'seguimiento' && conSoportes.value
+      ? '\n\n(Adjuntos extra: actas de capacitación cerradas vinculadas al cronograma)'
+      : '';
+    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF cronograma — ${tipoLabel})${soportesNote}`;
+  }
   if (isActaMode.value) {
     const para = allContactosTo.value
       .filter((c) => selectedTo.value.includes(c.email))
@@ -439,6 +485,49 @@ const imagenesPreviewNote = computed(() => {
   return `\n\n(Evidencias: ${imagenesSoporte.value.length} miniatura(s) en el cuerpo + adjuntos en tamaño completo)`;
 });
 
+async function loadCronogramaPreviewData() {
+  const [destData, previewRes] = await Promise.all([
+    clientesApi.destinatarios(props.clienteCodigo),
+    notificacionApi.previewCronograma(props.recordId, cronogramaTipo.value),
+  ]);
+  clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
+  defaultSubject.value = previewRes.subject || '';
+  defaultBody.value = previewRes.body || '';
+  subject.value = previewRes.subject || '';
+  bodyText.value = previewRes.body || '';
+  contactosTo.value = (destData.contactosConEmail || []).map((c, i) => ({
+    ...c,
+    id: `to-${i}-${c.email}`,
+  }));
+  contactosCc.value = (destData.equipoConEmail || []).map((c, i) => ({
+    ...c,
+    id: `cc-${i}-${c.email}`,
+  }));
+  selectedTo.value = contactosTo.value.map((c) => c.email);
+  selectedCc.value = contactosCc.value.map((c) => c.email);
+  if (!contactosTo.value.length) {
+    $q.notify({
+      type: 'warning',
+      message: 'El cliente no tiene contactos con correo. Agregue uno manualmente en Para.',
+    });
+  }
+}
+
+async function reloadCronogramaPreview() {
+  if (!props.modelValue || !isCronogramaMode.value || !props.clienteCodigo || !props.recordId) return;
+  loading.value = true;
+  try {
+    await loadCronogramaPreviewData();
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudo cargar la vista previa del cronograma',
+    });
+  } finally {
+    loading.value = false;
+  }
+}
+
 watch(
   () => props.modelValue,
   async (val) => {
@@ -452,11 +541,17 @@ watch(
     manualContactosCc.value = [];
     manualEmail.value = '';
     manualRol.value = 'to';
+    cronogramaTipo.value = 'programacion';
+    conSoportes.value = false;
     funcionarioSolicitante.value = null;
     imagenesSoporte.value = [];
     removingImagenIndex.value = -1;
     try {
       let preview;
+      if (isCronogramaMode.value) {
+        await loadCronogramaPreviewData();
+        return;
+      }
       if (isSemanaReportMode.value) {
         const [destData, previewData] = await Promise.all([
           clientesApi.destinatarios(props.clienteCodigo),
@@ -776,7 +871,7 @@ function addManualEmail() {
 function confirmSend() {
   if (!canSend.value) return;
   if (isSplitRecipientsMode.value) {
-    emit('send', {
+    const payload = {
       emails: allContactosTo.value
         .filter((c) => selectedTo.value.includes(c.email))
         .map((c) => c.email),
@@ -788,7 +883,12 @@ function confirmSend() {
         .map((c) => c.email),
       subject: subject.value.trim(),
       body: bodyText.value,
-    });
+    };
+    if (isCronogramaMode.value) payload.tipo = cronogramaTipo.value;
+    if (isCronogramaMode.value && cronogramaTipo.value === 'seguimiento') {
+      payload.conSoportes = conSoportes.value;
+    }
+    emit('send', payload);
     return;
   }
   emit('send', {

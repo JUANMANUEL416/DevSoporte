@@ -20,6 +20,8 @@ const routes = [
     children: [
       { path: '', component: () => import('pages/DashboardPage.vue') },
       { path: 'capacitaciones', component: () => import('pages/CapacitacionesPage.vue') },
+      { path: 'cronograma', component: () => import('pages/CronogramaPage.vue') },
+      { path: 'temas_capacitacion', component: () => import('pages/TemasCapacitacionPage.vue') },
       { path: 'clientes', component: () => import('pages/ClientesPage.vue') },
       { path: 'bitacora', component: () => import('pages/BitacoraPage.vue') },
       { path: 'correos', component: () => import('pages/BandejaCorreosPage.vue') },

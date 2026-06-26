@@ -1,5 +1,24 @@
 import { api } from 'src/boot/axios';
 
+export function extractApiError(err, fallback = 'Error en la solicitud') {
+  const status = err?.response?.status;
+  const data = err?.response?.data;
+
+  if (status === 404) {
+    return 'La API no tiene la ruta de notificación de cronograma. Use el backend de pruebas (npm run dev:pruebas) o despliegue la versión actualizada en producción.';
+  }
+  if (!err?.response) {
+    return err?.message || 'No se pudo conectar con la API. Verifique que el backend de pruebas esté activo en el puerto 3301.';
+  }
+  if (typeof data === 'string' && data.trim()) {
+    return data.trim().slice(0, 240);
+  }
+  if (data && typeof data === 'object') {
+    return data.error || data.details?.[0]?.message || data.message || fallback;
+  }
+  return fallback;
+}
+
 // Servicio genérico de acceso a la API REST. Cada "recurso" corresponde a una
 // entidad del backend (que a su vez proviene de una tabla del diccionario Clarion).
 export function useResource(resource) {
@@ -92,15 +111,43 @@ export const correosApi = {
       .then((r) => r.data),
 };
 
+export const cronogramaApi = {
+  pdf: (id, tipo = 'programacion') =>
+    api.get(`/cronograma/${encodeURIComponent(id)}/pdf`, {
+      params: { tipo },
+      responseType: 'blob',
+    }),
+  agregarTema: (id, payload) =>
+    api.post(`/cronograma/${encodeURIComponent(id)}/agregar-tema`, payload).then((r) => r.data),
+  cambiarEstadoItem: (id, item, payload) =>
+    api
+      .post(`/cronograma/${encodeURIComponent(id)}/items/${encodeURIComponent(item)}/cambiar-estado`, payload)
+      .then((r) => r.data),
+  cambiarEstadoTema: (id, payload) =>
+    api.post(`/cronograma/${encodeURIComponent(id)}/tema/cambiar-estado`, payload).then((r) => r.data),
+  cronogramasActa: (cliente) =>
+    api.get(`/cronograma/cliente/${encodeURIComponent(cliente)}/cronogramas-acta`).then((r) => r.data),
+  temasActa: (id) =>
+    api.get(`/cronograma/${encodeURIComponent(id)}/temas-acta`).then((r) => r.data),
+  prefillActa: (id, temaCodigo) =>
+    api.get(`/cronograma/${encodeURIComponent(id)}/tema/${encodeURIComponent(temaCodigo)}/prefill-acta`).then((r) => r.data),
+};
+
 export const notificacionApi = {
   previewCapacitacion: (id) =>
     api.get(`/capacitaciones/${encodeURIComponent(id)}/preview-notificacion`).then((r) => r.data),
   previewBitacora: (id) =>
     api.get(`/bitacora/${encodeURIComponent(id)}/preview-notificacion`).then((r) => r.data),
+  previewCronograma: (id, tipo = 'programacion') =>
+    api
+      .get(`/cronograma/${encodeURIComponent(id)}/preview-notificacion`, { params: { tipo } })
+      .then((r) => r.data),
   capacitacion: (id, payload) =>
     api.post(`/capacitaciones/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
   bitacora: (id, payload) =>
     api.post(`/bitacora/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
+  cronograma: (id, payload) =>
+    api.post(`/cronograma/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
 };
 
 export const controlVersionesApi = {

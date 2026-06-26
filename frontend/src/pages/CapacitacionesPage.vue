@@ -55,6 +55,14 @@
             class="cap-btn"
             @click="openCapCreate"
           />
+          <q-btn
+            outline
+            color="primary"
+            icon="event_note"
+            label="Desde cronograma"
+            class="cap-btn"
+            @click="openDesdeCronograma"
+          />
         </div>
       </header>
 
@@ -362,16 +370,73 @@
       :sending="sendingNotify"
       @send="onNotifySend"
     />
+
+    <q-dialog v-model="desdeCronoOpen" persistent>
+      <q-card style="min-width: 480px; max-width: 95vw">
+        <q-card-section>
+          <div class="text-h6">Capacitación desde cronograma</div>
+          <div class="text-caption text-grey q-mt-xs">
+            Seleccione el cronograma y el tema para llenar automáticamente tema y duración.
+          </div>
+        </q-card-section>
+        <q-card-section class="q-pt-none q-gutter-md">
+          <LookupSelect
+            v-model="cronoPickCliente"
+            resource="clientes"
+            value-field="codigo"
+            label-field="nombrecliente"
+            label="Cliente"
+            required
+            @pick="onCronoPickCliente"
+          />
+          <q-select
+            v-model="cronoPickId"
+            :options="cronoPickOptions"
+            label="Cronograma"
+            outlined
+            dense
+            emit-value
+            map-options
+            :disable="!cronoPickCliente || loadingCronoPick"
+            :loading="loadingCronoPick"
+            @update:model-value="onCronoPickId"
+          />
+          <q-select
+            v-model="cronoPickTema"
+            :options="temaPickOptions"
+            label="Tema"
+            outlined
+            dense
+            emit-value
+            map-options
+            :disable="!cronoPickId || loadingTemaPick"
+            :loading="loadingTemaPick"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" v-close-popup />
+          <q-btn
+            unelevated
+            color="primary"
+            label="Aplicar y crear"
+            :disable="!cronoPickCliente || !cronoPickId || !cronoPickTema"
+            :loading="loadingPrefillActa"
+            @click="aplicarDesdeCronograma"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
-import { useResource, notificacionApi, capacitacionesApi } from 'src/services/api';
+import { useResource, notificacionApi, capacitacionesApi, cronogramaApi } from 'src/services/api';
 import { api } from 'src/boot/axios';
 import { findModule } from 'src/config/modules';
 import GenericForm from 'components/GenericForm.vue';
+import LookupSelect from 'components/LookupSelect.vue';
 import PDFViewerComponent from 'components/PDFViewerComponent.vue';
 import SignaturePad from 'components/SignaturePad.vue';
 import NotifyRecipientDialog from 'components/NotifyRecipientDialog.vue';
@@ -443,6 +508,15 @@ const notifyOpen = ref(false);
 const notifyCliente = ref('');
 const notifyCapId = ref('');
 const sendingNotify = ref(false);
+const desdeCronoOpen = ref(false);
+const cronoPickCliente = ref('');
+const cronoPickId = ref('');
+const cronoPickTema = ref('');
+const cronoPickOptions = ref([]);
+const temaPickOptions = ref([]);
+const loadingCronoPick = ref(false);
+const loadingTemaPick = ref(false);
+const loadingPrefillActa = ref(false);
 const estadoDialogOpen = ref(false);
 const estadoCapRow = ref(null);
 const estadoOpciones = ref(null);
@@ -568,6 +642,85 @@ function openCapCreate() {
   capCurrent.value = {};
   capIsEdit.value = false;
   formCapOpen.value = true;
+}
+
+function openDesdeCronograma() {
+  cronoPickCliente.value = '';
+  cronoPickId.value = '';
+  cronoPickTema.value = '';
+  cronoPickOptions.value = [];
+  temaPickOptions.value = [];
+  desdeCronoOpen.value = true;
+}
+
+async function onCronoPickCliente() {
+  cronoPickId.value = '';
+  cronoPickTema.value = '';
+  cronoPickOptions.value = [];
+  temaPickOptions.value = [];
+  if (!cronoPickCliente.value) return;
+  loadingCronoPick.value = true;
+  try {
+    const rows = await cronogramaApi.cronogramasActa(cronoPickCliente.value);
+    cronoPickOptions.value = rows.map((r) => ({
+      label: `${r.cnscrono} — ${r.descripcion || 'Sin descripción'} (${r.num_items} ítems)`,
+      value: r.cnscrono,
+    }));
+    if (!rows.length) {
+      $q.notify({ type: 'warning', message: 'El cliente no tiene cronogramas con ítems' });
+    }
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudieron cargar los cronogramas',
+    });
+  } finally {
+    loadingCronoPick.value = false;
+  }
+}
+
+async function onCronoPickId() {
+  cronoPickTema.value = '';
+  temaPickOptions.value = [];
+  if (!cronoPickId.value) return;
+  loadingTemaPick.value = true;
+  try {
+    const rows = await cronogramaApi.temasActa(cronoPickId.value);
+    temaPickOptions.value = rows.map((r) => ({
+      label: `${r.tema_nombre || r.tema_codigo} — ${r.duracion_total} min (${r.num_items} ítems)`,
+      value: r.tema_codigo,
+    }));
+    if (!rows.length) {
+      $q.notify({ type: 'warning', message: 'El cronograma no tiene temas' });
+    }
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudieron cargar los temas',
+    });
+  } finally {
+    loadingTemaPick.value = false;
+  }
+}
+
+async function aplicarDesdeCronograma() {
+  if (!cronoPickId.value || !cronoPickTema.value) return;
+  loadingPrefillActa.value = true;
+  try {
+    const data = await cronogramaApi.prefillActa(cronoPickId.value, cronoPickTema.value);
+    capCurrent.value = { ...data };
+    capIsEdit.value = false;
+    desdeCronoOpen.value = false;
+    formCapOpen.value = true;
+    $q.notify({ type: 'positive', message: 'Tema y duración cargados desde el cronograma' });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudo cargar el tema del cronograma',
+    });
+  } finally {
+    loadingPrefillActa.value = false;
+  }
 }
 
 function openCapEdit(row) {

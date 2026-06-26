@@ -302,6 +302,16 @@ function dateRules(f) {
   const { min, max } = dateBounds(f);
   if (min && max) {
     rules.push((v) => !v || (v >= min && v <= max) || `Debe estar entre ${min} y ${max}`);
+  } else if (min) {
+    rules.push((v) => !v || v >= min || `No puede ser anterior a ${min}`);
+  } else if (max) {
+    rules.push((v) => !v || v <= max || `No puede ser posterior a ${max}`);
+  }
+  if (f.dateMinField && form.value[f.dateMinField]) {
+    const minFromForm = toDateKey(form.value[f.dateMinField]);
+    if (minFromForm) {
+      rules.push((v) => !v || v >= minFromForm || `No puede ser anterior a ${minFromForm}`);
+    }
   }
   return rules;
 }
@@ -349,7 +359,10 @@ watch(
     if (val) {
       const base = {};
       for (const f of props.module.fields) {
-        if (f.hidden) continue;
+        if (f.hidden) {
+          base[f.name] = props.record[f.name] ?? '';
+          continue;
+        }
         if (f.type === 'date') {
           if (props.record[f.name]) {
             base[f.name] = toDateKey(props.record[f.name]);

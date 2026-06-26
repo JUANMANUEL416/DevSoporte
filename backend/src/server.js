@@ -22,8 +22,27 @@ import { applyClienteNotificaciones } from './services/clienteNotificaciones.js'
 import {
   enviarNotificacionBitacora,
   enviarNotificacionCapacitacion,
+  enviarNotificacionCronograma,
 } from './services/notificacionEmail.js';
-import { previewBitacoraHandler, previewCapacitacionHandler } from './routes/notificacionPreview.js';
+import {
+  previewBitacoraHandler,
+  previewCapacitacionHandler,
+  previewCronogramaHandler,
+} from './routes/notificacionPreview.js';
+import { agregarTemaHandler, cambiarEstadoItemHandler, cambiarEstadoTemaHandler } from './routes/cronograma.js';
+import {
+  cronogramasClienteActaHandler,
+  prefillActaHandler,
+  temasActaHandler,
+} from './routes/cronogramaCapacitacion.js';
+import { cronogramaPdfHandler } from './routes/cronogramaPdf.js';
+import {
+  beforeCronogramaCreate,
+  beforeCronogramaItemCreate,
+  beforeCronogramaItemUpdate,
+  beforeCronogramaUpdate,
+  beforeTemaItemCreate,
+} from './services/cronogramaHooks.js';
 import destinatariosHandler from './routes/clienteNotificaciones.js';
 import clienteEquipoRoutes from './routes/clienteEquipo.js';
 import { cambiarEstadoHandler, estadoOpcionesHandler } from './routes/capacitacionEstado.js';
@@ -146,6 +165,17 @@ const entityHooks = {
     beforeCreate: beforeDevcambCreate,
     beforeUpdate: beforeDevcambUpdate,
   },
+  temas_capacitacion_items: {
+    beforeCreate: beforeTemaItemCreate,
+  },
+  cronograma: {
+    beforeCreate: beforeCronogramaCreate,
+    beforeUpdate: beforeCronogramaUpdate,
+  },
+  cronograma_items: {
+    beforeCreate: beforeCronogramaItemCreate,
+    beforeUpdate: beforeCronogramaItemUpdate,
+  },
 };
 
 // DevSoporte API
@@ -207,6 +237,24 @@ app.get('/api/capacitaciones/:id/estado-opciones', requireAuth, estadoOpcionesHa
 app.post('/api/capacitaciones/:id/cambiar-estado', requireAuth, cambiarEstadoHandler);
 app.get('/api/capacitaciones/:id/preview-notificacion', requireAuth, previewCapacitacionHandler);
 app.get('/api/bitacora/:id/preview-notificacion', requireAuth, previewBitacoraHandler);
+app.get('/api/cronograma/:id/preview-notificacion', requireAuth, previewCronogramaHandler);
+app.get('/api/cronograma/cliente/:cliente/cronogramas-acta', requireAuth, cronogramasClienteActaHandler);
+app.get('/api/cronograma/:id/temas-acta', requireAuth, temasActaHandler);
+app.get('/api/cronograma/:id/tema/:temaCodigo/prefill-acta', requireAuth, prefillActaHandler);
+app.post('/api/cronograma/:id/agregar-tema', requireAuth, agregarTemaHandler);
+app.post('/api/cronograma/:id/tema/cambiar-estado', requireAuth, cambiarEstadoTemaHandler);
+app.post('/api/cronograma/:id/items/:item/cambiar-estado', requireAuth, cambiarEstadoItemHandler);
+app.get('/api/cronograma/:id/pdf', requireAuth, cronogramaPdfHandler);
+app.post('/api/cronograma/:id/enviar-notificacion', requireAuth, async (req, res, next) => {
+  try {
+    const result = await enviarNotificacionCronograma(req.params.id, req.body, req.user?.usuario);
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
 app.post('/api/capacitaciones/:id/enviar-notificacion', requireAuth, async (req, res, next) => {
   try {
     const result = await enviarNotificacionCapacitacion(req.params.id, req.body, req.user?.usuario);
