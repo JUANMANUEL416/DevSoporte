@@ -329,17 +329,20 @@ function groupByTema(items) {
   const grupos = Array.from(map.values()).map((g) => ({
     ...g,
     items: g.items.sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0)),
-    fecha_probable: temaFechaProbable(g.items),
+    fecha_hora_sugerida: temaFechaHoraSugerida(g.items),
     dirigidoa: g.items[0]?.dirigidoa || '',
   }));
   return sortGruposByFechaProbable(grupos);
 }
 
-function temaFechaProbable(items) {
+function temaFechaHoraSugerida(items) {
   const dates = items.map((i) => i.fecha_probable).filter(Boolean);
-  if (!dates.length) return '—';
+  const hora = items.find((i) => i.hora_sugerida)?.hora_sugerida || '';
+  if (!dates.length && !hora) return '—';
   const sorted = [...dates].sort((a, b) => parseProbableDate(a) - parseProbableDate(b));
-  return fmtDate(sorted[0]);
+  const fechaStr = dates.length ? fmtDate(sorted[0]) : '';
+  if (fechaStr && hora) return `${fechaStr} ${hora}`;
+  return fechaStr || hora || '—';
 }
 
 const SEGUIMIENTO_FIXED_COLS_W = 450 + 550 + 850 + 758;
@@ -477,7 +480,9 @@ function drawDirigidoaRow(doc, L, yU, dirigidoaText, tableLeft, tableW) {
 }
 
 function measureTemaHeader(doc, L, temaName, tableLeft, tableW) {
-  const temaValW = tableW - 10 - 1000 - 1100 - 1048;
+  const fhLabelW = 1500;
+  const fhValW = 1648;
+  const temaValW = tableW - 10 - 1000 - fhLabelW - fhValW;
   return textHeightUnits(doc, L, temaName, temaValW - VALUE_TEXT_PAD_LEFT - 12, 10, BASE_TEMA_H);
 }
 
@@ -486,9 +491,9 @@ function drawTemaHeaderRow(doc, L, yU, grupo, tableLeft, tableW) {
   const labelW = 1000;
   const labelX = tableLeft + 10;
   const temaValX = labelX + labelW;
-  const fechaLabelW = 1100;
-  const fechaValW = 1048;
-  const temaValW = tableW - 10 - labelW - fechaLabelW - fechaValW;
+  const fhLabelW = 1500;
+  const fhValW = 1648;
+  const temaValW = tableW - 10 - labelW - fhLabelW - fhValW;
   const temaH = measureTemaHeader(doc, L, temaName, tableLeft, tableW);
   const cellInset = 16;
 
@@ -503,15 +508,24 @@ function drawTemaHeaderRow(doc, L, yU, grupo, tableLeft, tableW) {
     { size: 10, bold: true, lineBreak: true },
   );
 
-  const fechaLabelX = temaValX + temaValW;
-  labelBox(doc, L, fechaLabelX, yU + cellInset, fechaLabelW, temaH - cellInset * 2, 'F. PROBABLE', 8);
-  drawInnerBox(doc, L, fechaLabelX + fechaLabelW, yU + cellInset, fechaValW, temaH - cellInset * 2);
+  const fhLabelX = temaValX + temaValW;
+  labelBox(
+    doc,
+    L,
+    fhLabelX,
+    yU + cellInset,
+    fhLabelW,
+    temaH - cellInset * 2,
+    'Fecha y hora sugerida',
+    8,
+  );
+  drawInnerBox(doc, L, fhLabelX + fhLabelW, yU + cellInset, fhValW, temaH - cellInset * 2);
   textIn(
     doc,
-    grupo.fecha_probable || '—',
-    L.px(fechaLabelX + fechaLabelW + 4),
+    grupo.fecha_hora_sugerida || '—',
+    L.px(fhLabelX + fhLabelW + 4),
     L.py(yU) + L.ph(temaH) * 0.38,
-    L.pw(fechaValW - 8),
+    L.pw(fhValW - 8),
     { size: 10, bold: true, align: 'center' },
   );
 

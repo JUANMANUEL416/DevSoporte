@@ -19,7 +19,10 @@ const COL_HEADER_Y = PROYECTO_Y + PROYECTO_H;
 const COL_HEADER_H = 437;
 const COL_HEADER_BOTTOM = COL_HEADER_Y + COL_HEADER_H;
 const DETAIL_BASE_H = 302;
-const DETAIL_FIRST_GAP = 70;
+const DETAIL_FIRST_GAP = 110;
+const DETAIL_ROW_GAP = 55;
+const DETAIL_CELL_PAD_X = 18;
+const DETAIL_CELL_PAD_Y = 20;
 const FOOTER_Y = 8229;
 
 const HEADER_TOP = 323;
@@ -300,17 +303,17 @@ function colX(index, L) {
 }
 
 function measureRowHeight(doc, L, row) {
-  const pad = L.ph(16);
+  const pad = L.ph(DETAIL_CELL_PAD_Y + 4);
   const minH = L.ph(DETAIL_BASE_H);
   if (!row) return minH;
 
   doc.font('Helvetica').fontSize(8);
-  const hSolicitud = doc.heightOfString(row.solicitud || ' ', { width: colWidth(3, L) - L.pw(20) });
-  const hRespuesta = doc.heightOfString(row.respuesta || ' ', { width: colWidth(4, L) - L.pw(20) });
+  const hSolicitud = doc.heightOfString(row.solicitud || ' ', { width: colWidth(3, L) - L.pw(DETAIL_CELL_PAD_X * 2) });
+  const hRespuesta = doc.heightOfString(row.respuesta || ' ', { width: colWidth(4, L) - L.pw(DETAIL_CELL_PAD_X * 2) });
   const hArea = doc.heightOfString(row.area_nombre || row.clase || row.soporte || ' ', {
-    width: colWidth(2, L) - L.pw(16),
+    width: colWidth(2, L) - L.pw(DETAIL_CELL_PAD_X * 2),
   });
-  const hFunc = doc.heightOfString(row.funcionario || ' ', { width: colWidth(1, L) - L.pw(16) });
+  const hFunc = doc.heightOfString(row.funcionario || ' ', { width: colWidth(1, L) - L.pw(DETAIL_CELL_PAD_X * 2) });
 
   return Math.max(minH, hSolicitud + pad, hRespuesta + pad, hArea + pad, hFunc + pad);
 }
@@ -324,8 +327,8 @@ function drawDetailRow(doc, L, yPt, row) {
 
   if (!row) return rowH;
 
-  const padX = L.pw(8);
-  const padY = L.ph(14);
+  const padX = L.pw(DETAIL_CELL_PAD_X);
+  const padY = L.ph(DETAIL_CELL_PAD_Y);
 
   textIn(doc, fmtDate(row.fecha), colX(0, L) + padX, yPt + padY, colWidth(0, L) - padX * 2, {
     size: 8,
@@ -495,9 +498,11 @@ export function buildBitacoraPdf({ encabezado, soportes }) {
 
     let { L, y } = startPage();
 
-    for (const row of rows) {
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
       const rowH = measureRowHeight(doc, L, row);
-      if (y + rowH > L.contentBottom) {
+      const rowGap = i < rows.length - 1 ? L.ph(DETAIL_ROW_GAP) : 0;
+      if (y + rowH + rowGap > L.contentBottom) {
         closeTableBox(doc, L, y);
         drawFooter(doc, L, pageNum);
         doc.addPage({ size: 'LETTER', layout: 'landscape' });
@@ -505,7 +510,7 @@ export function buildBitacoraPdf({ encabezado, soportes }) {
         ({ L, y } = startPage());
       }
       drawDetailRow(doc, L, y, row);
-      y += rowH;
+      y += rowH + rowGap;
     }
 
     closeTableBox(doc, L, y);

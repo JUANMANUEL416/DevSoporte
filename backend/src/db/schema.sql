@@ -633,6 +633,7 @@ CREATE TABLE IF NOT EXISTS cronocapd (
     duracion        SMALLINT,
     dirigidoa       VARCHAR(500),
     fecha_probable  DATE,
+    hora_sugerida   VARCHAR(5),
     estado          VARCHAR(20) DEFAULT 'Programado',
     fecha_real      DATE,
     observacion     VARCHAR(1000),

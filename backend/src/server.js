@@ -29,7 +29,7 @@ import {
   previewCapacitacionHandler,
   previewCronogramaHandler,
 } from './routes/notificacionPreview.js';
-import { agregarTemaHandler, cambiarEstadoItemHandler, cambiarEstadoTemaHandler } from './routes/cronograma.js';
+import { agregarTemaHandler, cambiarEstadoItemHandler, cambiarEstadoTemaHandler, duplicarHandler } from './routes/cronograma.js';
 import {
   cronogramasClienteActaHandler,
   prefillActaHandler,
@@ -242,6 +242,7 @@ app.get('/api/cronograma/cliente/:cliente/cronogramas-acta', requireAuth, cronog
 app.get('/api/cronograma/:id/temas-acta', requireAuth, temasActaHandler);
 app.get('/api/cronograma/:id/tema/:temaCodigo/prefill-acta', requireAuth, prefillActaHandler);
 app.post('/api/cronograma/:id/agregar-tema', requireAuth, agregarTemaHandler);
+app.post('/api/cronograma/:id/duplicar', requireAuth, duplicarHandler);
 app.post('/api/cronograma/:id/tema/cambiar-estado', requireAuth, cambiarEstadoTemaHandler);
 app.post('/api/cronograma/:id/items/:item/cambiar-estado', requireAuth, cambiarEstadoItemHandler);
 app.get('/api/cronograma/:id/pdf', requireAuth, cronogramaPdfHandler);

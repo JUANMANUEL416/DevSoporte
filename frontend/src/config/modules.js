@@ -689,6 +689,7 @@ export const modules = [
         { name: 'descripcion', label: 'Descripción', field: 'descripcion', align: 'left' },
         { name: 'duracion', label: 'Min', field: 'duracion', align: 'right' },
         { name: 'fecha_probable', label: 'F. probable', field: 'fecha_probable', align: 'left', format: (v) => fmtDate(v) },
+        { name: 'hora_sugerida', label: 'Hora', field: 'hora_sugerida', align: 'left' },
         { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
       ],
       fields: [
@@ -704,6 +705,7 @@ export const modules = [
           type: 'date',
           dateContextKeys: { min: 'fecha_inicial', max: 'fecha_final' },
         },
+        { name: 'hora_sugerida', label: 'Hora sugerida', type: 'time' },
         { name: 'estado', label: 'Estado', type: 'text', fixed: true, hideOnCreate: true },
         {
           name: 'fecha_real',

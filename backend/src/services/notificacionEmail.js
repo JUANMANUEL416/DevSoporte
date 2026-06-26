@@ -49,6 +49,16 @@ function fmtFecha(value) {
   return dt.toLocaleString('es-CO');
 }
 
+function fmtFechaSolo(value) {
+  if (!value) return '—';
+  const s = String(value).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const dt = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('es-CO');
+}
+
 function buildCapacitacionEmailBundle(cap, cliente, bodyTemplate, { pdfFilename } = {}) {
   const defaults = buildCapacitacionNotificacionContent(cap, cliente);
   const sourceBody = String(bodyTemplate || '').trim() || defaults.body;
@@ -325,7 +335,8 @@ function buildCronogramaEmailBundle(enc, cliente, bodyTemplate, {
   const rows = [
     { label: 'Cliente', value: nombreCliente },
     { label: 'Consecutivo', value: enc.cnscrono },
-    { label: 'Fecha', value: fmtFecha(enc.fecha) },
+    { label: 'Desde', value: fmtFechaSolo(enc.fecha_inicial || enc.fecha) },
+    { label: 'Hasta', value: fmtFechaSolo(enc.fecha_final || enc.fecha_inicial || enc.fecha) },
     { label: 'Estado', value: enc.estado || '—' },
     { label: 'Descripcion', value: enc.descripcion || '—' },
   ];

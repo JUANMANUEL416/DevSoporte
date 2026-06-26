@@ -1,4 +1,9 @@
-import { agregarTemaCronograma, cambiarEstadoItemCronograma, cambiarEstadoTemaCronograma } from '../services/cronogramaHooks.js';
+import {
+  agregarTemaCronograma,
+  cambiarEstadoItemCronograma,
+  cambiarEstadoTemaCronograma,
+  duplicarCronograma,
+} from '../services/cronogramaHooks.js';
 
 export async function agregarTemaHandler(req, res, next) {
   try {
@@ -28,6 +33,19 @@ export async function cambiarEstadoTemaHandler(req, res, next) {
   try {
     const result = await cambiarEstadoTemaCronograma(req.params.id, req.body || {});
     res.json(result);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+}
+
+export async function duplicarHandler(req, res, next) {
+  try {
+    const result = await duplicarCronograma(req.params.id, {
+      descripcion: req.body?.descripcion,
+      usuario: req.user?.usuario,
+    });
+    res.status(201).json(result);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     next(err);

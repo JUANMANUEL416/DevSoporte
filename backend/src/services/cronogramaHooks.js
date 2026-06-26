@@ -1,7 +1,19 @@
 import { query } from '../db/pool.js';
+import { generarConsecutivo } from './consecutivo.js';
 
 const ITEM_ESTADOS = ['Programado', 'Realizado', 'No cumplido', 'Cancelado'];
 const CRONO_ESTADOS = ['Borrador', 'Programado', 'Cerrado'];
+
+function normalizeHora(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const s = String(value).trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s)) {
+    const err = new Error('Hora sugerida inválida (use formato HH:MM)');
+    err.status = 400;
+    throw err;
+  }
+  return s;
+}
 
 function toDateKey(value) {
   if (!value) return '';
@@ -131,6 +143,9 @@ export async function beforeCronogramaItemCreate(body) {
     body.item = await nextItem('cronocapd', 'cnscrono', body.cnscrono);
   }
   if (!body.estado) body.estado = 'Programado';
+  if (body.hora_sugerida !== undefined) {
+    body.hora_sugerida = normalizeHora(body.hora_sugerida);
+  }
 }
 
 export async function beforeCronogramaItemUpdate(body, ids) {
@@ -181,13 +196,24 @@ export async function beforeCronogramaItemUpdate(body, ids) {
       [cnscrono, prev.tema_codigo, body.dirigidoa ?? ''],
     );
   }
+
+  if (body.hora_sugerida !== undefined && prev.tema_codigo) {
+    await query(
+      'UPDATE cronocapd SET hora_sugerida = $3 WHERE cnscrono = $1 AND tema_codigo = $2',
+      [cnscrono, prev.tema_codigo, normalizeHora(body.hora_sugerida)],
+    );
+  }
 }
 
-export async function agregarTemaCronograma(cnscrono, { tema_codigo: temaCodigo, fecha_probable: fechaProbable } = {}) {
+export async function agregarTemaCronograma(
+  cnscrono,
+  { tema_codigo: temaCodigo, fecha_probable: fechaProbable, hora_sugerida: horaSugerida } = {},
+) {
   await ensureCronogramaEditable(cnscrono);
   if (fechaProbable) {
     await validateItemFechasEnRango(cnscrono, { fecha_probable: fechaProbable });
   }
+  const hora = normalizeHora(horaSugerida);
 
   const temaRes = await query(
     'SELECT codigo, nombre, dirigidoa FROM captema WHERE codigo = $1 AND estado = $2',
@@ -218,8 +244,9 @@ export async function agregarTemaCronograma(cnscrono, { tema_codigo: temaCodigo,
   for (const row of itemsRes.rows) {
     const ins = await query(
       `INSERT INTO cronocapd (
-         cnscrono, item, tema_codigo, tema_nombre, descripcion, duracion, dirigidoa, fecha_probable, estado
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Programado')
+         cnscrono, item, tema_codigo, tema_nombre, descripcion, duracion, dirigidoa,
+         fecha_probable, hora_sugerida, estado
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Programado')
        RETURNING *`,
       [
         cnscrono,
@@ -230,6 +257,7 @@ export async function agregarTemaCronograma(cnscrono, { tema_codigo: temaCodigo,
         row.duracion,
         tema.dirigidoa || '',
         fechaProbable || null,
+        hora,
       ],
     );
     inserted.push(ins.rows[0]);
@@ -310,6 +338,68 @@ export async function cambiarEstadoTemaCronograma(
     tema: temaNombre || temaCodigo,
     count: updated.length,
     items: updated,
+  };
+}
+
+export async function duplicarCronograma(cnscrono, { descripcion, usuario } = {}) {
+  const headRes = await query('SELECT * FROM cronocap WHERE cnscrono = $1', [cnscrono]);
+  const head = headRes.rows[0];
+  if (!head) {
+    const err = new Error('Cronograma no encontrado');
+    err.status = 404;
+    throw err;
+  }
+
+  const itemsRes = await query(
+    'SELECT * FROM cronocapd WHERE cnscrono = $1 ORDER BY item',
+    [cnscrono],
+  );
+
+  const newCnscrono = await generarConsecutivo({ acnsPrefijo: 'CRONOCAP', pad: 8 });
+  const descBase = String(head.descripcion || '').trim();
+  const descFinal = String(descripcion || '').trim()
+    || (descBase ? `${descBase} (refuerzo)` : 'Cronograma refuerzo');
+
+  await query(
+    `INSERT INTO cronocap (
+       cnscrono, cliente, fecha, fecha_inicial, fecha_final, descripcion, estado, observacion, usuario
+     ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, 'Borrador', $6, $7)`,
+    [
+      newCnscrono,
+      head.cliente,
+      head.fecha_inicial,
+      head.fecha_final,
+      descFinal,
+      head.observacion || '',
+      usuario || head.usuario || null,
+    ],
+  );
+
+  for (const row of itemsRes.rows) {
+    await query(
+      `INSERT INTO cronocapd (
+         cnscrono, item, tema_codigo, tema_nombre, descripcion, duracion, dirigidoa,
+         fecha_probable, hora_sugerida, estado
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Programado')`,
+      [
+        newCnscrono,
+        row.item,
+        row.tema_codigo,
+        row.tema_nombre,
+        row.descripcion,
+        row.duracion,
+        row.dirigidoa || '',
+        row.fecha_probable,
+        row.hora_sugerida,
+      ],
+    );
+  }
+
+  return {
+    cnscrono: newCnscrono,
+    origen: cnscrono,
+    items: itemsRes.rows.length,
+    descripcion: descFinal,
   };
 }
 

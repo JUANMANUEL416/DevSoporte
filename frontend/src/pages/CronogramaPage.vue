@@ -34,7 +34,30 @@
 
     <section class="crono-panel">
       <header class="crono-panel__header">
-        <div class="crono-panel__actions">
+        <div class="crono-panel__filters">
+          <q-input
+            v-model="filtroFechaIni"
+            label="Desde (fecha inicio)"
+            type="date"
+            dense
+            outlined
+            stack-label
+            class="crono-filter-date"
+            bg-color="white"
+            @update:model-value="onFilterFechas"
+          />
+          <q-input
+            v-model="filtroFechaFin"
+            label="Hasta (fecha inicio)"
+            type="date"
+            dense
+            outlined
+            stack-label
+            class="crono-filter-date"
+            bg-color="white"
+            :min="filtroFechaIni || undefined"
+            @update:model-value="onFilterFechas"
+          />
           <q-input
             v-model="searchCrono"
             dense
@@ -89,6 +112,16 @@
             </q-td>
             <q-td auto-width class="crono-table__actions-cell" @click.stop>
               <div class="crono-actions">
+                <q-btn
+                  flat
+                  dense
+                  round
+                  icon="content_copy"
+                  color="secondary"
+                  @click="confirmDuplicar(props.row)"
+                >
+                  <q-tooltip>Duplicar cronograma (refuerzo)</q-tooltip>
+                </q-btn>
                 <q-btn
                   flat
                   dense
@@ -207,6 +240,14 @@
                           >
                             <q-tooltip>Editar dirigido a</q-tooltip>
                           </q-btn>
+                        </div>
+                        <div v-if="grupo.fecha_probable || grupo.hora_sugerida" class="tema-group__programacion">
+                          <span v-if="grupo.fecha_probable">
+                            F. probable: <strong>{{ fmtDateOnly(grupo.fecha_probable) }}</strong>
+                          </span>
+                          <span v-if="grupo.hora_sugerida">
+                            Hora sugerida: <strong>{{ grupo.hora_sugerida }}</strong>
+                          </span>
                         </div>
                       </div>
                       <div class="tema-group__actions">
@@ -351,6 +392,14 @@
             :min="agregarTemaFechaMin"
             :max="agregarTemaFechaMax"
             :rules="agregarTemaFechaRules"
+          />
+          <q-input
+            v-model="agregarTemaHora"
+            label="Hora sugerida (opcional, HH:MM)"
+            type="time"
+            outlined
+            dense
+            bg-color="white"
           />
         </q-card-section>
         <q-card-actions align="right">
@@ -597,7 +646,7 @@ const itemModule = computed(() => ({
 
 const cronoColumns = computed(() => [
   { name: 'expand', label: '', field: 'expand', align: 'left', style: 'width: 40px' },
-  { name: 'acciones', label: '', field: 'acciones', align: 'left', style: 'width: 52px' },
+  { name: 'acciones', label: '', field: 'acciones', align: 'left', style: 'width: 72px; min-width: 72px' },
   ...mod.columns,
 ]);
 const itemColumns = computed(() => [
@@ -610,6 +659,8 @@ const itemCache = ref({});
 const itemLoading = ref({});
 const loadingCrono = ref(false);
 const searchCrono = ref('');
+const filtroFechaIni = ref('');
+const filtroFechaFin = ref('');
 const expandedCnscrono = ref(null);
 const expandedTemas = ref({});
 const pagCrono = ref({ page: 1, rowsPerPage: 10, rowsNumber: 0 });
@@ -629,7 +680,9 @@ const agregarTemaOpen = ref(false);
 const agregarTemaRow = ref(null);
 const agregarTemaCodigo = ref('');
 const agregarTemaFecha = ref('');
+const agregarTemaHora = ref('');
 const agregandoTema = ref(false);
+const duplicando = ref(false);
 
 const estadoItemOpen = ref(false);
 const estadoDialogMode = ref('item');
@@ -668,6 +721,13 @@ function toDateKey(value) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function fmtDateOnly(value) {
+  const key = toDateKey(value);
+  if (!key) return '';
+  const [y, m, day] = key.split('-');
+  return `${day}/${m}/${y}`;
+}
+
 function findCronoRow(cnscrono) {
   return cronoRows.value.find((r) => r.cnscrono === cnscrono) || null;
 }
@@ -696,6 +756,23 @@ const agregarTemaFechaRules = computed(() => {
   if (!min || !max) return [];
   return [(v) => !v || (v >= min && v <= max) || `Debe estar entre ${min} y ${max}`];
 });
+
+function currentMonthRange() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+  return {
+    ini: `${y}-${m}-01`,
+    fin: `${y}-${m}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
+function initFiltroFechas() {
+  const { ini, fin } = currentMonthRange();
+  filtroFechaIni.value = ini;
+  filtroFechaFin.value = fin;
+}
 
 function dataCols(cols) {
   return cols.filter((c) => c.name !== 'acciones' && c.name !== 'expand');
@@ -777,6 +854,8 @@ function groupByTema(rows) {
     .map((g) => ({
       ...g,
       dirigidoa: g.items[0]?.dirigidoa || '',
+      fecha_probable: g.items.find((i) => i.fecha_probable)?.fecha_probable || '',
+      hora_sugerida: g.items.find((i) => i.hora_sugerida)?.hora_sugerida || '',
       items: g.items.sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0)),
     }))
     .sort((a, b) => {
@@ -796,11 +875,14 @@ function getTemaGroups(cnscrono) {
 async function loadCronogramas() {
   loadingCrono.value = true;
   try {
-    const res = await cronoApi.list({
+    const params = {
       q: searchCrono.value,
       page: pagCrono.value.page,
       limit: pagCrono.value.rowsPerPage,
-    });
+    };
+    if (filtroFechaIni.value) params.fechaini = filtroFechaIni.value;
+    if (filtroFechaFin.value) params.fechafin = filtroFechaFin.value;
+    const res = await cronoApi.list(params);
     cronoRows.value = res.data;
     pagCrono.value.rowsNumber = res.total;
 
@@ -846,6 +928,15 @@ function onSearchCrono() {
   loadCronogramas();
 }
 
+function onFilterFechas() {
+  if (filtroFechaIni.value && filtroFechaFin.value && filtroFechaFin.value < filtroFechaIni.value) {
+    filtroFechaFin.value = filtroFechaIni.value;
+  }
+  pagCrono.value.page = 1;
+  expandedCnscrono.value = null;
+  loadCronogramas();
+}
+
 function onCronoRequest(req) {
   pagCrono.value.page = req.pagination.page;
   pagCrono.value.rowsPerPage = req.pagination.rowsPerPage;
@@ -877,7 +968,30 @@ function openAgregarTema(row) {
   agregarTemaRow.value = row;
   agregarTemaCodigo.value = '';
   agregarTemaFecha.value = '';
+  agregarTemaHora.value = '';
   agregarTemaOpen.value = true;
+}
+
+function confirmDuplicar(row) {
+  $q.dialog({
+    title: 'Duplicar cronograma',
+    message: `Se creará una copia en Borrador del cronograma ${row.cnscrono} con los mismos temas (refuerzo).`,
+    cancel: true,
+    persistent: true,
+  }).onOk(async () => {
+    duplicando.value = true;
+    try {
+      const result = await cronogramaApi.duplicar(row.cnscrono);
+      $q.notify({ type: 'positive', message: `Cronograma duplicado: ${result.cnscrono}` });
+      await loadCronogramas();
+      expandedCnscrono.value = result.cnscrono;
+      await loadItems(result.cnscrono, true);
+    } catch (err) {
+      $q.notify({ type: 'negative', message: extractApiError(err) });
+    } finally {
+      duplicando.value = false;
+    }
+  });
 }
 
 async function confirmAgregarTema() {
@@ -897,6 +1011,7 @@ async function confirmAgregarTema() {
   try {
     const payload = { tema_codigo: agregarTemaCodigo.value };
     if (agregarTemaFecha.value) payload.fecha_probable = agregarTemaFecha.value;
+    if (agregarTemaHora.value) payload.hora_sugerida = agregarTemaHora.value;
     const result = await cronogramaApi.agregarTema(agregarTemaRow.value.cnscrono, payload);
     agregarTemaOpen.value = false;
     $q.notify({
@@ -1126,6 +1241,7 @@ async function onNotifySend(payload) {
 }
 
 onMounted(() => {
+  initFiltroFechas();
   loadCronogramas();
   loadMailStatus();
 });
@@ -1133,9 +1249,9 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .cronograma-page {
-  padding: 16px 20px;
-  max-width: 1280px;
-  margin: 0 auto;
+  padding: 12px 12px 16px;
+  max-width: none;
+  width: 100%;
 }
 
 .crono-hero {
@@ -1222,7 +1338,7 @@ onMounted(() => {
 }
 
 .crono-panel {
-  padding: 16px;
+  padding: 10px 8px 12px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: #fff;
@@ -1231,6 +1347,19 @@ onMounted(() => {
 
 .crono-panel__header {
   margin-bottom: 14px;
+}
+
+.crono-panel__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.crono-filter-date {
+  width: 168px;
+  min-width: 148px;
 }
 
 .crono-panel__actions {
@@ -1253,6 +1382,7 @@ onMounted(() => {
 .crono-table {
   border-radius: 8px;
   overflow: hidden;
+  width: 100%;
 
   :deep(thead tr:first-child th) {
     background: #f8fafc;
@@ -1261,17 +1391,26 @@ onMounted(() => {
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: #64748b;
+    padding: 6px 8px;
+  }
+
+  :deep(tbody td) {
+    padding: 4px 8px;
   }
 }
 
 .crono-table__expand-cell {
-  width: 40px;
-  padding-right: 0 !important;
+  width: 36px;
+  min-width: 36px;
+  padding: 2px 0 !important;
 }
 
 .crono-table__actions-cell {
-  width: 52px;
-  padding-right: 4px !important;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
+  padding: 2px 4px !important;
+  white-space: nowrap;
 }
 
 .crono-table__row {
@@ -1296,15 +1435,15 @@ onMounted(() => {
   background: #f8fafc;
 
   > td {
-    padding: 0 !important;
+    padding: 0 4px 0 0 !important;
     border-top: none !important;
   }
 }
 
 .items-expand {
   position: relative;
-  margin: 0 12px 12px 48px;
-  padding: 14px;
+  margin: 0 4px 10px 0;
+  padding: 10px 10px 12px;
   border-radius: 10px;
   border: 1px solid #90caf9;
   background: linear-gradient(180deg, #f8fbff 0%, #ffffff 40%);
@@ -1398,6 +1537,15 @@ onMounted(() => {
   line-height: 1.35;
 }
 
+.tema-group__programacion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #37474f;
+}
+
 .tema-group__title {
   flex: 1;
   min-width: 0;
@@ -1440,8 +1588,10 @@ onMounted(() => {
 
 .crono-actions {
   display: inline-flex;
-  flex-wrap: wrap;
-  gap: 2px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
 
   &--row {
     flex-wrap: nowrap;

@@ -107,6 +107,18 @@
                 :rules="dateRules(f)"
               />
               <q-input
+                v-else-if="f.type === 'time'"
+                v-model="form[f.name]"
+                :label="f.label"
+                type="time"
+                outlined
+                dense
+                stack-label
+                class="generic-form__field"
+                bg-color="white"
+                :disable="isFieldDisabled(f)"
+              />
+              <q-input
                 v-else-if="f.type === 'password'"
                 v-model="form[f.name]"
                 :label="passwordLabel(f)"
