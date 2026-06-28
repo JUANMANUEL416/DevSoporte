@@ -26,8 +26,12 @@ ON CONFLICT (codigo, documento) DO UPDATE SET
   estado = EXCLUDED.estado,
   email = EXCLUDED.email;
 
-INSERT INTO soport (codigo, nombre, estado, usuario) VALUES
-  ('PRU01', 'Técnico Pruebas', 'A', 'TECPRU')
-ON CONFLICT (codigo) DO UPDATE SET nombre = EXCLUDED.nombre, estado = EXCLUDED.estado;
+INSERT INTO soport (codigo, nombre, estado, usuario, email) VALUES
+  ('PRU01', 'Técnico Pruebas', 'A', 'TECPRU', 'jose.jimenez@ixcolombia.com')
+ON CONFLICT (codigo) DO UPDATE SET
+  nombre = EXCLUDED.nombre,
+  estado = EXCLUDED.estado,
+  usuario = EXCLUDED.usuario,
+  email = EXCLUDED.email;
 
 UPDATE ususu SET clave = clave WHERE usuario = 'ADMIN';

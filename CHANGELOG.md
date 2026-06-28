@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.3] - 2026-06-28
+
+### Agregado
+- **Recuperar contraseña** para técnicos de soporte: enlace por correo y página pública para definir nueva clave.
+- Campo **correo electrónico** en técnicos de soporte (requerido para recuperación).
+
+### Cambiado
+- **Login** rediseñado con aspecto moderno y flujo integrado de olvidé mi contraseña.
+- **Panel de inicio** y **menú lateral**: tarjetas estilo ticket, más compactas y sin scroll vertical en desktop.
+
 ## [1.2.2] - 2026-06-26
 
 ### Agregado
@@ -81,6 +91,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 ### Agregado
 - Migración inicial Clarion → web (bitácora, capacitaciones, firmas, clientes, catálogos).
 
+[1.2.3]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.1.5...v1.2.0

@@ -14,6 +14,11 @@ const routes = [
     meta: { public: true },
   },
   {
+    path: '/recuperar-clave/:token(.*)',
+    component: () => import('pages/RecuperarClavePage.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     meta: { requiresAuth: true },

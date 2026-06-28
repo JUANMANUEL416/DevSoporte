@@ -34,6 +34,12 @@ export function useResource(resource) {
 export const authApi = {
   login: (usuario, clave) => api.post('/auth/login', { usuario, clave }).then((r) => r.data),
   me: () => api.get('/auth/me').then((r) => r.data),
+  solicitarRecuperarClave: (usuario) =>
+    api.post('/auth/recuperar-clave', { usuario }).then((r) => r.data),
+  validarRecuperarClave: (token) =>
+    api.get(`/auth/recuperar-clave/${encodeURIComponent(token)}`).then((r) => r.data),
+  restablecerClave: (token, clave, clave2) =>
+    api.post(`/auth/recuperar-clave/${encodeURIComponent(token)}`, { clave, clave2 }).then((r) => r.data),
 };
 
 export const appApi = {

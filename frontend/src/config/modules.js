@@ -847,6 +847,7 @@ export const modules = [
       { name: 'codigo', label: 'Código', field: 'codigo', align: 'left', sortable: true },
       { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'left' },
       { name: 'usuario', label: 'Usuario acceso', field: 'usuario', align: 'left' },
+      { name: 'email', label: 'Correo', field: 'email', align: 'left' },
       { name: 'estado', label: 'Estado', field: 'estado', align: 'left', format: fmtEstadoAI },
       {
         name: 'firma_fecha',
@@ -864,6 +865,12 @@ export const modules = [
         label: 'Usuario de acceso',
         type: 'text',
         hint: 'Para iniciar sesión en DevSoporte',
+      },
+      {
+        name: 'email',
+        label: 'Correo electrónico',
+        type: 'text',
+        hint: 'Para recuperar contraseña y notificaciones',
       },
       {
         name: 'clave',

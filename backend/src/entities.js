@@ -44,8 +44,8 @@ export const entities = {
   soportes: {
     table: 'soport',
     pk: ['codigo'],
-    columns: ['codigo', 'nombre', 'estado', 'usuario', 'clave', 'firma', 'firma_fecha'],
-    listSelect: 'codigo, nombre, estado, usuario, firma_fecha',
+    columns: ['codigo', 'nombre', 'estado', 'usuario', 'clave', 'email', 'firma', 'firma_fecha'],
+    listSelect: 'codigo, nombre, estado, usuario, email, firma_fecha',
     responseOmit: ['clave'],
     search: ['codigo', 'nombre', 'usuario'],
     orderBy: 'codigo',

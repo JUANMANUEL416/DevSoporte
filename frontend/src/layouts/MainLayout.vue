@@ -166,12 +166,12 @@ onMounted(async () => {
 }
 
 .sidebar-scroll {
-  padding: 12px 10px;
+  padding: 8px 8px;
 }
 
 .sidebar-list {
   :deep(.q-item) {
-    min-height: 44px;
+    min-height: 38px;
   }
 
   :deep(.q-separator) {
@@ -183,16 +183,16 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
   border: 1px solid transparent;
   color: #1e293b;
 
   &--sm {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
   }
 
   &--inicio {
@@ -233,62 +233,92 @@ onMounted(async () => {
 }
 
 .sidebar-item {
-  margin-bottom: 6px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  background: linear-gradient(90deg, #ffffff 0%, #f1f5f9 100%);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  margin-bottom: 4px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  overflow: hidden;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    left: 38px;
+    z-index: 1;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+  }
+
+  &::before {
+    top: -5px;
+  }
+
+  &::after {
+    bottom: -5px;
+  }
 
   :deep(.q-item__section--avatar) {
-    min-width: 42px;
-    padding-right: 8px;
+    min-width: 40px;
+    padding-right: 6px;
+    border-right: 2px dashed rgba(15, 23, 42, 0.12);
+    margin-right: 4px;
   }
 
   &--sub {
-    margin-left: 8px;
-    margin-right: 4px;
-    padding: 5px 10px;
-    border-radius: 9px;
+    margin-left: 6px;
+    margin-right: 2px;
+    padding: 3px 8px 3px 3px;
 
     :deep(.q-item__section--avatar) {
-      min-width: 38px;
+      min-width: 36px;
+    }
+
+    &::before,
+    &::after {
+      left: 34px;
     }
   }
 
   &--inicio {
-    background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
+    background: linear-gradient(90deg, #eff6ff 0%, #fff 100%);
     border-color: #bfdbfe;
   }
 
   &--configuracion {
-    background: linear-gradient(90deg, #fafbff 0%, #e8eaf6 100%);
+    background: linear-gradient(90deg, #fafbff 0%, #fff 100%);
     border-color: #c5cae9;
   }
 
   &--desarrollo {
-    background: linear-gradient(90deg, #fdfbff 0%, #ede7f6 100%);
+    background: linear-gradient(90deg, #fdfbff 0%, #fff 100%);
     border-color: #d1c4e9;
   }
 
   &--soporte {
-    background: linear-gradient(90deg, #f6fffe 0%, #e0f2f1 100%);
+    background: linear-gradient(90deg, #f6fffe 0%, #fff 100%);
     border-color: #b2dfdb;
   }
 
   &--solicitudes {
-    background: linear-gradient(90deg, #f5faff 0%, #e3f2fd 100%);
+    background: linear-gradient(90deg, #f5faff 0%, #fff 100%);
     border-color: #bbdefb;
   }
 
   &--seguridad {
-    background: linear-gradient(90deg, #fafbfc 0%, #eceff1 100%);
+    background: linear-gradient(90deg, #fafbfc 0%, #fff 100%);
     border-color: #cfd8dc;
   }
 
   &:hover {
-    border-color: #94a3b8;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    border-color: #64748b;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    transform: translateX(2px);
   }
 
   &--active {
@@ -322,15 +352,15 @@ onMounted(async () => {
 }
 
 .sidebar-item__label {
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: #334155;
 }
 
 .sidebar-group {
-  margin-bottom: 8px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
   background: #fff;
   overflow: hidden;
 
@@ -346,10 +376,10 @@ onMounted(async () => {
   }
 
   :deep(.sidebar-group__header) {
-    padding: 8px 10px;
-    min-height: 48px;
+    padding: 5px 8px;
+    min-height: 40px;
     background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%);
-    border-bottom: 1px solid #eef2f7;
+    border-bottom: 1px dashed #dbeafe;
   }
 
   :deep(.sidebar-group__chevron) {
@@ -379,15 +409,15 @@ onMounted(async () => {
 }
 
 .sidebar-group__label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #475569;
 }
 
 :deep(.sidebar-group .q-expansion-item__content) {
-  padding: 8px 6px 10px;
-  background: #fafbfc;
+  padding: 4px 4px 6px;
+  background: #f8fafc;
 }
 </style>

@@ -63,14 +63,25 @@ function applyFirmaRules(body) {
   body.firma_fecha = new Date().toISOString();
 }
 
+function normalizeEmail(body) {
+  if (body.email === undefined) return;
+  const email = String(body.email || '').trim().toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw httpError('Correo electrónico inválido');
+  }
+  body.email = email || null;
+}
+
 export async function beforeSoportCreate(body) {
   await normalizeUsuario(body);
+  normalizeEmail(body);
   await hashClaveIfPresent(body);
   applyFirmaRules(body);
 }
 
 export async function beforeSoportUpdate(body, ids) {
   await normalizeUsuario(body, ids[0]);
+  normalizeEmail(body);
   await hashClaveIfPresent(body);
   if (body.firma !== undefined) {
     const current = await query('SELECT firma FROM soport WHERE codigo = $1', [ids[0]]);

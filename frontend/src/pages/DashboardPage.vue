@@ -1,68 +1,51 @@
 <template>
   <q-page class="dashboard-page">
-    <!-- Hero -->
     <section class="dashboard-hero">
-      <div class="dashboard-hero__content">
-        <div class="dashboard-hero__headline">
-          <span class="dashboard-hero__eyebrow">Panel de control</span>
-          <h1 class="dashboard-hero__title">
-            Bienvenido{{ userName ? `, ${userName}` : '' }}
-          </h1>
-        </div>
-        <p class="dashboard-hero__subtitle">
-          Gestione soporte, clientes y capacitaciones desde un solo lugar.
-        </p>
+      <div class="dashboard-hero__main">
+        <span class="dashboard-hero__eyebrow">Panel de control</span>
+        <h1 class="dashboard-hero__title">
+          Bienvenido{{ userName ? `, ${userName}` : '' }}
+        </h1>
       </div>
-      <div class="dashboard-hero__meta">
-        <span class="dashboard-hero__date">
-          <q-icon name="today" size="16px" />
-          {{ todayLabel }}
-        </span>
-      </div>
+      <span class="dashboard-hero__date">
+        <q-icon name="today" size="15px" />
+        {{ todayLabel }}
+      </span>
     </section>
 
-    <!-- Accesos directos -->
     <section class="dashboard-shortcuts">
-      <h2 class="dashboard-shortcuts__title">Accesos directos</h2>
+      <h2 class="dashboard-shortcuts__title">Módulos</h2>
 
-      <div class="row q-col-gutter-md">
-        <div
+      <div class="ticket-grid">
+        <article
           v-for="m in modules"
           :key="m.resource"
-          class="col-12 col-sm-6 col-md-3"
+          class="ticket-card"
+          :class="`ticket-card--${groupKey(m.group)}`"
+          tabindex="0"
+          role="button"
+          @click="goTo(m.resource)"
+          @keyup.enter="goTo(m.resource)"
         >
-          <article
-            class="shortcut-card"
-            :class="`shortcut-card--${groupKey(m.group)}`"
-            tabindex="0"
-            role="button"
-            @click="goTo(m.resource)"
-            @keyup.enter="goTo(m.resource)"
-          >
-            <div class="shortcut-card__head">
-              <div class="shortcut-card__icon">
-                <q-icon :name="m.icon" size="22px" />
-              </div>
-              <span class="shortcut-card__group">{{ m.group }}</span>
+          <div class="ticket-card__stub" aria-hidden="true">
+            <q-icon :name="m.icon" size="20px" />
+          </div>
+
+          <div class="ticket-card__body">
+            <div class="ticket-card__row">
+              <span class="ticket-card__group">{{ m.group }}</span>
+              <q-icon name="arrow_forward" class="ticket-card__arrow" size="14px" />
             </div>
-
-            <h3 class="shortcut-card__title">{{ m.title }}</h3>
-
-            <div v-if="cardStat(m.resource)" class="shortcut-card__stat">
-              <q-spinner-dots v-if="loadingStats" color="primary" size="20px" />
+            <h3 class="ticket-card__title">{{ m.title }}</h3>
+            <div v-if="cardStat(m.resource)" class="ticket-card__stat">
+              <q-spinner-dots v-if="loadingStats" color="primary" size="16px" />
               <template v-else>
-                <span class="shortcut-card__stat-value">{{ cardStat(m.resource).value }}</span>
-                <span class="shortcut-card__stat-label">{{ cardStat(m.resource).label }}</span>
+                <strong>{{ cardStat(m.resource).value }}</strong>
+                <span>{{ cardStat(m.resource).label }}</span>
               </template>
             </div>
-            <p v-else class="shortcut-card__hint">Acceso rápido al módulo</p>
-
-            <div class="shortcut-card__footer">
-              <span>Abrir módulo</span>
-              <q-icon name="arrow_forward" size="16px" />
-            </div>
-          </article>
-        </div>
+          </div>
+        </article>
       </div>
     </section>
   </q-page>
@@ -120,17 +103,17 @@ function cardStat(resource) {
     case 'clientes':
       return {
         value: stats.value.clientes,
-        label: stats.value.clientes === 1 ? 'cliente registrado' : 'clientes registrados',
+        label: stats.value.clientes === 1 ? 'cliente' : 'clientes',
       };
     case 'bitacora':
       return {
         value: stats.value.bitacorasMes,
-        label: `en ${monthLabel.value}`,
+        label: monthLabel.value,
       };
     case 'capacitaciones':
       return {
         value: stats.value.capacitacionesMes,
-        label: `en ${monthLabel.value}`,
+        label: monthLabel.value,
       };
     default:
       return null;
@@ -154,210 +137,308 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .dashboard-page {
-  padding: 16px 20px;
-  max-width: 1280px;
+  --ticket-stub: 46px;
+  --page-bg: #eef2f7;
+  box-sizing: border-box;
+  min-height: calc(100dvh - 50px);
+  max-height: calc(100dvh - 50px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 12px;
+  max-width: 1360px;
   margin: 0 auto;
+  background: var(--page-bg);
 }
 
 .dashboard-hero {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 20px;
-  padding: 14px 20px;
-  margin-bottom: 20px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #1565c0 0%, #0d47a1 55%, #1a237e 100%);
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: linear-gradient(120deg, #1565c0 0%, #0d47a1 100%);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(13, 71, 161, 0.2);
+  box-shadow: 0 3px 12px rgba(13, 71, 161, 0.18);
 }
 
-.dashboard-hero__headline {
+.dashboard-hero__main {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 12px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
 }
 
 .dashboard-hero__eyebrow {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.85;
+  opacity: 0.82;
 }
 
 .dashboard-hero__title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1.2;
-}
-
-.dashboard-hero__subtitle {
-  margin: 4px 0 0;
-  font-size: 0.8rem;
-  line-height: 1.35;
-  opacity: 0.88;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-hero__date {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  flex-shrink: 0;
+  padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.72rem;
   text-transform: capitalize;
   white-space: nowrap;
 }
 
-.dashboard-shortcuts__title {
-  margin: 0 0 14px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #334155;
-}
-
-.shortcut-card {
+.dashboard-shortcuts {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+}
+
+.dashboard-shortcuts__title {
+  margin: 0 0 8px;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.ticket-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.ticket-card {
+  position: relative;
+  display: flex;
+  min-height: 86px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   background: #fff;
   cursor: pointer;
   outline: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    left: calc(var(--ticket-stub) - 6px);
+    z-index: 2;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--page-bg);
+    border: 1px solid #cbd5e1;
+  }
+
+  &::before {
+    top: -7px;
+  }
+
+  &::after {
+    bottom: -7px;
+  }
 
   &:hover,
   &:focus-visible {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
-    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+    border-color: #94a3b8;
+
+    .ticket-card__arrow {
+      transform: translateX(3px);
+      opacity: 1;
+    }
   }
 
   &--configuracion {
-    background: linear-gradient(180deg, #fafbff 0%, #ffffff 38%);
     border-color: #c5cae9;
 
-    .shortcut-card__head {
-      background: linear-gradient(90deg, #e8eaf6 0%, #9fa8da 100%);
+    .ticket-card__stub {
+      background: linear-gradient(180deg, #e8eaf6 0%, #c5cae9 100%);
+      color: #3949ab;
     }
+  }
 
-    .shortcut-card__icon { color: #3949ab; }
+  &--desarrollo {
+    border-color: #d1c4e9;
+
+    .ticket-card__stub {
+      background: linear-gradient(180deg, #ede7f6 0%, #d1c4e9 100%);
+      color: #5e35b1;
+    }
   }
 
   &--soporte {
-    background: linear-gradient(180deg, #f6fffe 0%, #ffffff 38%);
     border-color: #b2dfdb;
 
-    .shortcut-card__head {
-      background: linear-gradient(90deg, #e0f2f1 0%, #80cbc4 100%);
+    .ticket-card__stub {
+      background: linear-gradient(180deg, #e0f2f1 0%, #b2dfdb 100%);
+      color: #00695c;
     }
+  }
 
-    .shortcut-card__icon { color: #00695c; }
+  &--solicitudes {
+    border-color: #bbdefb;
+
+    .ticket-card__stub {
+      background: linear-gradient(180deg, #e3f2fd 0%, #bbdefb 100%);
+      color: #1565c0;
+    }
+  }
+
+  &--seguridad {
+    border-color: #cfd8dc;
+
+    .ticket-card__stub {
+      background: linear-gradient(180deg, #eceff1 0%, #cfd8dc 100%);
+      color: #455a64;
+    }
   }
 }
 
-.shortcut-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: -16px -16px 14px;
-  padding: 12px 14px;
-  border-radius: 12px 12px 0 0;
-}
-
-.shortcut-card__icon {
+.ticket-card__stub {
+  position: relative;
+  flex: 0 0 var(--ticket-stub);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-right: 2px dashed rgba(15, 23, 42, 0.14);
 }
 
-.shortcut-card__group {
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.55);
-}
-
-.shortcut-card__title {
-  margin: 0 0 10px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.shortcut-card__stat {
+.ticket-card__body {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-height: 32px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 10px 8px 8px;
 }
 
-.shortcut-card__stat-value {
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 1;
-  color: #0f172a;
-}
-
-.shortcut-card__stat-label {
-  font-size: 0.78rem;
-  color: #64748b;
-  text-transform: capitalize;
-}
-
-.shortcut-card__hint {
-  margin: 0 0 12px;
-  min-height: 32px;
-  font-size: 0.78rem;
-  color: #94a3b8;
-}
-
-.shortcut-card__footer {
+.ticket-card__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid #eef2f7;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: #1565c0;
+  gap: 6px;
+}
 
-  .q-icon {
-    transition: transform 0.2s ease;
+.ticket-card__group {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ticket-card__arrow {
+  flex-shrink: 0;
+  color: #1565c0;
+  opacity: 0.55;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.ticket-card__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #0f172a;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ticket-card__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 16px;
+  font-size: 0.68rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  strong {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: #0f172a;
   }
 
-  .shortcut-card:hover & .q-icon,
-  .shortcut-card:focus-visible & .q-icon {
-    transform: translateX(4px);
+  span {
+    text-transform: capitalize;
+  }
+}
+
+@media (max-width: 1199px) {
+  .ticket-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 991px) {
+  .ticket-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-page {
+    max-height: none;
+    overflow: auto;
   }
 }
 
 @media (max-width: 599px) {
   .dashboard-page {
-    padding: 12px;
+    padding: 8px 10px;
   }
 
   .dashboard-hero {
-    padding: 12px 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 12px;
   }
 
   .dashboard-hero__title {
-    font-size: 1.05rem;
+    white-space: normal;
+  }
+
+  .ticket-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .ticket-card {
+    min-height: 78px;
   }
 }
 </style>

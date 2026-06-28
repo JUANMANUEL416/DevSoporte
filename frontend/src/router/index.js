@@ -25,7 +25,10 @@ export default route(function () {
     if (to.query.registro) {
       return { path: `/registrar/${to.query.registro}` };
     }
-    if (to.meta.public || to.path.startsWith('/firmar') || to.path.startsWith('/registrar')) {
+    if (to.query.recuperar) {
+      return { path: `/recuperar-clave/${to.query.recuperar}` };
+    }
+    if (to.meta.public || to.path.startsWith('/firmar') || to.path.startsWith('/registrar') || to.path.startsWith('/recuperar-clave')) {
       return true;
     }
 

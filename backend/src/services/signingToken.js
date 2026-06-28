@@ -56,6 +56,10 @@ export function verifySigningToken(token) {
     if (!payload.consecutivo) throw new Error('Token inválido');
     return payload;
   }
+  if (payload.scope === 'password_reset') {
+    if (!payload.codigo || !payload.usuario) throw new Error('Token inválido');
+    return payload;
+  }
   throw new Error('Token inválido');
 }
 
@@ -99,4 +103,22 @@ export function buildFirmaUrl(token) {
   const base = (process.env.PUBLIC_APP_URL || 'http://localhost:9020').replace(/\/$/, '');
   // Query ?firma= se conserva en clientes de correo (Gmail suele perder el fragmento #/...).
   return `${base}/?firma=${encodeURIComponent(token)}`;
+}
+
+export function createPasswordResetToken({ codigo, usuario }) {
+  const hours = Number(process.env.PASSWORD_RESET_EXPIRES_HOURS) || 1;
+  return jwt.sign(
+    {
+      scope: 'password_reset',
+      codigo: String(codigo),
+      usuario: String(usuario).trim().toUpperCase(),
+    },
+    SECRET,
+    { expiresIn: `${hours}h` },
+  );
+}
+
+export function buildPasswordResetUrl(token) {
+  const base = (process.env.PUBLIC_APP_URL || 'http://localhost:9020').replace(/\/$/, '');
+  return `${base}/?recuperar=${encodeURIComponent(token)}`;
 }

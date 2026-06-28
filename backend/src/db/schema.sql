@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS soport (
     estado VARCHAR(10),
     usuario VARCHAR(20),
     clave VARCHAR(255),
+    email VARCHAR(120),
     firma TEXT,
     firma_fecha TIMESTAMPTZ
 );
