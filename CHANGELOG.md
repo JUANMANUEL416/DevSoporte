@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.4] - 2026-06-28
+
+### Agregado
+- **Agenda de contactos**: catálogo de correos frecuentes (equipo de trabajo, clientes, externos).
+- Integración en **Bandeja de Correos**: selector de agenda, carga automática del equipo en CC y acceso rápido al catálogo.
+
 ## [1.2.3] - 2026-06-28
 
 ### Agregado
@@ -91,6 +97,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 ### Agregado
 - Migración inicial Clarion → web (bitácora, capacitaciones, firmas, clientes, catálogos).
 
+[1.2.4]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/JUANMANUEL416/DevSoporte/compare/v1.2.0...v1.2.1

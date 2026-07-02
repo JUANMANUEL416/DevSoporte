@@ -19,6 +19,17 @@ export function fmtEstadoAI(value) {
   return value || '';
 }
 
+export const AGENDA_CATEGORIA_OPTIONS = [
+  { label: 'Equipo de trabajo', value: 'equipo' },
+  { label: 'Cliente', value: 'cliente' },
+  { label: 'Externo', value: 'externo' },
+];
+
+export function fmtAgendaCategoria(value) {
+  const opt = AGENDA_CATEGORIA_OPTIONS.find((o) => o.value === value);
+  return opt?.label || value || '';
+}
+
 export const modules = [
   // -------------------- Configuración --------------------
   {
@@ -333,6 +344,62 @@ export const modules = [
   },
 
   // -------------------- Soporte --------------------
+  {
+    group: 'Soporte',
+    icon: 'contacts',
+    resource: 'agenda_contactos',
+    title: 'Agenda de Contactos',
+    idField: 'codigo',
+    formCols: 2,
+    fetchOnEdit: true,
+    columns: [
+      { name: 'codigo', label: 'Código', field: 'codigo', align: 'left', sortable: true },
+      { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'left', sortable: true },
+      { name: 'cargo', label: 'Cargo', field: 'cargo', align: 'left' },
+      { name: 'email', label: 'Correo', field: 'email', align: 'left' },
+      { name: 'empresa', label: 'Empresa', field: 'empresa', align: 'left' },
+      {
+        name: 'categoria',
+        label: 'Categoría',
+        field: 'categoria',
+        align: 'left',
+        format: fmtAgendaCategoria,
+      },
+      { name: 'estado', label: 'Estado', field: 'estado', align: 'left', format: fmtEstadoAI },
+    ],
+    fields: [
+      { name: 'codigo', label: 'Código', type: 'text', hideOnCreate: true, fixed: true },
+      { name: 'nombre', label: 'Nombre', type: 'text', required: true, colSpan: 2 },
+      { name: 'cargo', label: 'Cargo', type: 'text' },
+      { name: 'email', label: 'Correo electrónico', type: 'text', required: true },
+      { name: 'empresa', label: 'Empresa / área', type: 'text' },
+      { name: 'telefono', label: 'Teléfono', type: 'text' },
+      {
+        name: 'categoria',
+        label: 'Categoría',
+        type: 'select',
+        options: AGENDA_CATEGORIA_OPTIONS,
+        default: 'equipo',
+        required: true,
+      },
+      {
+        name: 'cliente',
+        label: 'Cliente vinculado (opcional)',
+        type: 'lookup',
+        lookupResource: 'clientes',
+        lookupValue: 'codigo',
+        lookupLabel: 'nombrecliente',
+      },
+      {
+        name: 'estado',
+        label: 'Estado',
+        type: 'select',
+        options: ESTADO_AI_OPTIONS,
+        default: 'A',
+      },
+      { name: 'notas', label: 'Notas', type: 'textarea', colSpan: 2 },
+    ],
+  },
   {
     group: 'Soporte',
     icon: 'mark_email_unread',

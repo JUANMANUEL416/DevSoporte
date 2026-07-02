@@ -488,6 +488,24 @@ CREATE TABLE IF NOT EXISTS rasist_invite (
 CREATE INDEX IF NOT EXISTS rasist_invite_cnscapacita ON rasist_invite (cnscapacita);
 
 -- ----------------------------------------------------------------------------
+-- Agenda de contactos (AGCON) — equipo de trabajo y contactos frecuentes
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS agcon (
+    codigo    VARCHAR(20) PRIMARY KEY,
+    nombre    VARCHAR(100) NOT NULL,
+    cargo     VARCHAR(80),
+    email     VARCHAR(120) NOT NULL,
+    empresa   VARCHAR(100),
+    telefono  VARCHAR(30),
+    categoria VARCHAR(20) DEFAULT 'equipo',
+    cliente   VARCHAR(20) REFERENCES clie(codigo) ON DELETE SET NULL,
+    estado    VARCHAR(10) DEFAULT 'A',
+    notas     TEXT
+);
+CREATE INDEX IF NOT EXISTS agcon_estado ON agcon (estado, categoria);
+CREATE UNIQUE INDEX IF NOT EXISTS agcon_email_unique ON agcon (LOWER(TRIM(email)));
+
+-- ----------------------------------------------------------------------------
 -- Bandeja / bitácora de correos enviados (CORREOS)
 -- Registra cada envío realizado por el sistema (fecha, destinatario, éxito).
 -- ----------------------------------------------------------------------------
