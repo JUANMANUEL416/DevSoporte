@@ -35,3 +35,16 @@ ON CONFLICT (codigo) DO UPDATE SET
   email = EXCLUDED.email;
 
 UPDATE ususu SET clave = clave WHERE usuario = 'ADMIN';
+
+INSERT INTO agcon (codigo, nombre, cargo, email, empresa, categoria, estado) VALUES
+  ('AGC0001', 'Analista Soporte Pruebas', 'Coordinador', 'equipo.pruebas@example.com', 'IX Colombia', 'equipo', 'A'),
+  ('AGC0002', 'Contacto Cliente Pruebas', 'Coordinador TI', 'contacto.pruebas@example.com', 'Cliente Pruebas S.A.', 'cliente', 'A')
+ON CONFLICT (codigo) DO UPDATE SET
+  nombre = EXCLUDED.nombre,
+  cargo = EXCLUDED.cargo,
+  email = EXCLUDED.email,
+  empresa = EXCLUDED.empresa,
+  categoria = EXCLUDED.categoria,
+  estado = EXCLUDED.estado;
+
+UPDATE acns SET consecutivo = GREATEST(consecutivo, 2) WHERE prefijo = 'AGC';

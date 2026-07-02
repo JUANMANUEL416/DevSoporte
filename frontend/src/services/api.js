@@ -117,6 +117,14 @@ export const correosApi = {
       .then((r) => r.data),
 };
 
+export const agendaContactosApi = {
+  list: (params = {}) => api.get('/agenda_contactos', { params }).then((r) => r.data),
+  listActivos: (params = {}) =>
+    api
+      .get('/agenda_contactos', { params: { estado: 'A', limit: 200, ...params } })
+      .then((r) => r.data?.data ?? []),
+};
+
 export const cronogramaApi = {
   pdf: (id, tipo = 'programacion') =>
     api.get(`/cronograma/${encodeURIComponent(id)}/pdf`, {

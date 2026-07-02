@@ -72,6 +72,7 @@ import {
 import { beforeActproyCreate, beforeActproyUpdate } from './services/actproyHooks.js';
 import { beforeSoportCreate, beforeSoportUpdate } from './services/soportHooks.js';
 import { beforeDevcambCreate, beforeDevcambUpdate } from './services/devcambHooks.js';
+import { beforeAgconCreate, beforeAgconUpdate } from './services/agendaContactoHooks.js';
 import controlVersionesRoutes from './routes/controlVersiones.js';
 
 async function ensureCapacitacionAbierta(cnscapacita) {
@@ -160,6 +161,10 @@ const entityHooks = {
   soportes: {
     beforeCreate: beforeSoportCreate,
     beforeUpdate: beforeSoportUpdate,
+  },
+  agenda_contactos: {
+    beforeCreate: beforeAgconCreate,
+    beforeUpdate: beforeAgconUpdate,
   },
   cambios_desarrollo: {
     beforeCreate: beforeDevcambCreate,

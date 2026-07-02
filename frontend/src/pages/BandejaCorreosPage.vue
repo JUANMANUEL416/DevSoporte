@@ -161,6 +161,25 @@
                   class="bandeja-compose__manual-add"
                   @click="addManualEmail"
                 />
+                <q-btn
+                  outline
+                  dense
+                  no-caps
+                  color="teal"
+                  icon="contacts"
+                  label="Agenda"
+                  class="bandeja-compose__agenda-btn"
+                  @click="abrirAgendaDialog"
+                />
+                <q-btn
+                  flat
+                  dense
+                  no-caps
+                  color="grey-7"
+                  icon="open_in_new"
+                  label="Gestionar"
+                  @click="irAgendaContactos"
+                />
               </div>
             </div>
 
@@ -198,6 +217,7 @@
                     <q-checkbox v-model="selectedTo" :val="c.email" color="primary" dense @click.stop />
                     <span class="bandeja-compose__recipient-line">
                       <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                      <q-badge v-if="c.agenda" dense color="teal-7" label="A" class="q-mr-xs" />
                       {{ contactCardLabel(c) }}
                       <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
                     </span>
@@ -251,6 +271,7 @@
                     <q-checkbox v-model="selectedCc" :val="c.email" color="teal" dense @click.stop />
                     <span class="bandeja-compose__recipient-line">
                       <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                      <q-badge v-if="c.agenda" dense color="teal-7" label="A" class="q-mr-xs" />
                       {{ contactCardLabel(c) }}
                       <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
                     </span>
@@ -352,6 +373,69 @@
             :disable="!canSend"
             @click="enviar"
           />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- ----------------------- Agenda de contactos ----------------------- -->
+    <q-dialog v-model="agendaOpen">
+      <q-card class="bandeja-agenda">
+        <div class="bandeja-card__header bandeja-card__header--compact">
+          <q-icon name="contacts" size="18px" />
+          <span>Agenda de contactos</span>
+          <q-space />
+          <q-btn flat dense round size="sm" icon="close" color="white" v-close-popup />
+        </div>
+
+        <q-card-section class="q-pt-sm">
+          <q-input
+            v-model="agendaFilter"
+            label="Buscar nombre, correo o empresa"
+            outlined
+            dense
+            clearable
+            debounce="200"
+          >
+            <template #prepend><q-icon name="search" /></template>
+          </q-input>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none bandeja-agenda__list">
+          <q-inner-loading :showing="loadingAgenda">
+            <q-spinner color="primary" size="32px" />
+          </q-inner-loading>
+
+          <div v-if="!loadingAgenda && !agendaFiltrados.length" class="text-center text-grey-6 q-pa-md">
+            No hay contactos activos en la agenda.
+          </div>
+
+          <q-list v-else bordered separator class="rounded-borders">
+            <q-item v-for="c in agendaFiltrados" :key="c.codigo" tag="label">
+              <q-item-section avatar>
+                <q-checkbox v-model="agendaSelected" :val="c.codigo" dense color="primary" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>{{ c.nombre }}</q-item-label>
+                <q-item-label caption>
+                  {{ c.email }}
+                  <span v-if="c.cargo"> · {{ c.cargo }}</span>
+                  <span v-if="c.empresa"> · {{ c.empresa }}</span>
+                </q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-badge
+                  :color="c.categoria === 'equipo' ? 'teal' : c.categoria === 'cliente' ? 'blue' : 'grey'"
+                  :label="fmtAgendaCategoria(c.categoria)"
+                />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+
+        <q-card-actions align="right" class="bandeja-agenda__actions">
+          <q-btn flat no-caps label="Equipo → CC" color="teal" @click="agregarEquipoAgendaCc" />
+          <q-btn flat no-caps label="Agregar a CC" color="primary" @click="agregarAgendaSeleccion('cc')" />
+          <q-btn unelevated no-caps label="Agregar a Para" color="primary" @click="agregarAgendaSeleccion('to')" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -550,8 +634,10 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
-import { useResource, correosApi, clientesApi } from 'src/services/api';
+import { useResource, correosApi, clientesApi, agendaContactosApi } from 'src/services/api';
+import { fmtAgendaCategoria } from 'src/config/modules';
 import SignaturePad from 'components/SignaturePad.vue';
 import {
   PLANTILLA_CUERPO_SUGERIDA,
@@ -560,6 +646,7 @@ import {
 } from 'src/utils/correoBodyHtml';
 
 const $q = useQuasar();
+const router = useRouter();
 const clientesRes = useResource('clientes');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -590,6 +677,24 @@ const manualRolOptions = [
   { label: 'Para', value: 'to' },
   { label: 'CC', value: 'cc' },
 ];
+
+const agendaOpen = ref(false);
+const agendaFilter = ref('');
+const agendaRows = ref([]);
+const agendaSelected = ref([]);
+const loadingAgenda = ref(false);
+
+const agendaFiltrados = computed(() => {
+  const term = String(agendaFilter.value || '').trim().toLowerCase();
+  if (!term) return agendaRows.value;
+  return agendaRows.value.filter((c) => {
+    const haystack = [c.nombre, c.email, c.cargo, c.empresa, c.categoria]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(term);
+  });
+});
 
 // --- Clientes ---
 const allClientes = ref([]);
@@ -865,6 +970,107 @@ function abrirNuevo() {
   plantillaSnapshot.value = tpl;
   composeOpen.value = true;
   nextTick(resizeCuerpoTextarea);
+  loadEquipoAgendaToCc();
+}
+
+function agendaEntryFromRow(c) {
+  return {
+    id: `ag-${c.codigo}`,
+    codigo: c.codigo,
+    email: c.email,
+    nombre: c.nombre,
+    cargo: c.cargo,
+    empresa: c.empresa,
+    categoria: c.categoria,
+    agenda: true,
+  };
+}
+
+function addAgendaContacts(contacts, zone) {
+  let added = 0;
+  for (const c of contacts) {
+    const email = String(c.email || '').trim();
+    if (!EMAIL_RE.test(email)) continue;
+    if (existsInZone(email, zone)) {
+      const selectedList = zone === 'cc' ? selectedCc : selectedTo;
+      if (!selectedList.value.includes(email)) selectedList.value.push(email);
+      continue;
+    }
+    const entry = agendaEntryFromRow(c);
+    if (zone === 'cc') {
+      contactosCc.value.push(entry);
+      if (!selectedCc.value.includes(email)) selectedCc.value.push(email);
+    } else {
+      contactosTo.value.push(entry);
+      if (!selectedTo.value.includes(email)) selectedTo.value.push(email);
+    }
+    added += 1;
+  }
+  return added;
+}
+
+async function loadAgendaRows() {
+  loadingAgenda.value = true;
+  try {
+    agendaRows.value = await agendaContactosApi.listActivos();
+  } catch {
+    agendaRows.value = [];
+  } finally {
+    loadingAgenda.value = false;
+  }
+}
+
+async function loadEquipoAgendaToCc() {
+  try {
+    const rows = await agendaContactosApi.listActivos({ categoria: 'equipo' });
+    const added = addAgendaContacts(rows, 'cc');
+    if (added > 0) {
+      $q.notify({
+        type: 'info',
+        message: `${added} contacto(s) del equipo agregados en CC`,
+        timeout: 2500,
+      });
+    }
+  } catch {
+    /* sin agenda */
+  }
+}
+
+async function abrirAgendaDialog() {
+  agendaSelected.value = [];
+  agendaFilter.value = '';
+  agendaOpen.value = true;
+  await loadAgendaRows();
+}
+
+function agregarAgendaSeleccion(zone) {
+  const picked = agendaRows.value.filter((c) => agendaSelected.value.includes(c.codigo));
+  if (!picked.length) {
+    $q.notify({ type: 'warning', message: 'Seleccione al menos un contacto' });
+    return;
+  }
+  const added = addAgendaContacts(picked, zone);
+  agendaOpen.value = false;
+  $q.notify({
+    type: 'positive',
+    message: `${added || picked.length} contacto(s) agregados a ${zone === 'cc' ? 'CC' : 'Para'}`,
+  });
+}
+
+function agregarEquipoAgendaCc() {
+  const equipo = agendaRows.value.filter((c) => c.categoria === 'equipo');
+  if (!equipo.length) {
+    $q.notify({ type: 'warning', message: 'No hay contactos de equipo en la agenda' });
+    return;
+  }
+  const added = addAgendaContacts(equipo, 'cc');
+  agendaOpen.value = false;
+  $q.notify({ type: 'positive', message: `${added || equipo.length} contacto(s) del equipo en CC` });
+}
+
+function irAgendaContactos() {
+  composeOpen.value = false;
+  router.push('/agenda_contactos');
 }
 
 function restaurarPlantilla() {
@@ -1328,8 +1534,29 @@ onMounted(async () => {
   min-width: 110px;
 }
 
-.bandeja-compose__manual-add {
+.bandeja-compose__manual-add,
+.bandeja-compose__agenda-btn {
   flex-shrink: 0;
+}
+
+.bandeja-agenda {
+  width: min(560px, 96vw);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.bandeja-agenda__list {
+  position: relative;
+  flex: 1;
+  min-height: 180px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.bandeja-agenda__actions {
+  border-top: 1px solid #e2e8f0;
+  padding: 10px 16px;
 }
 
 .bandeja-compose__main {
