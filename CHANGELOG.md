@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.5] - 2026-07-06
+
+### Agregado
+- **Menú Administrativo** con acceso restringido: clientes VIP y cuentas de cobro.
+- **Clientes VIP**: plantilla Word/HTML para cuenta de cobro, variables arrastrables, vista previa y PDF (Puppeteer).
+- **Cuentas de cobro**: numeración configurable, duplicar avanzando un mes, envío por correo con PDF automático y **adjuntos PDF adicionales**.
+- **Correo CXC**: remitente independiente (`SMTP_FROM_CXC`) y perfil SMTP opcional (`SMTP_CXC_*`).
+- **Firmas grupales bitácora**: al cerrar semana, PDF por funcionario y enlace público para firmar varios soportes.
+
+### Cambiado
+- Bandeja de correos: mejoras en redacción, adjuntos y uso de agenda de contactos.
+
 ## [1.2.4] - 2026-06-28
 
 ### Agregado
