@@ -3,12 +3,32 @@ import { registrarCorreo } from './correoLog.js';
 import { saveSentCopy } from './saveSentCopy.js';
 import { isPruebas } from '../config/env.js';
 
-export function isMailConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER);
-}
+/** Perfiles: default (soporte/bitácora) | cxc (cuentas de cobro VIP). */
+export function getMailProfileConfig(profile = 'default') {
+  const useCxcSmtp = profile === 'cxc'
+    && process.env.SMTP_CXC_HOST
+    && process.env.SMTP_CXC_USER;
 
-function createTransport() {
-  return nodemailer.createTransport({
+  if (useCxcSmtp) {
+    return {
+      profile: 'cxc',
+      host: process.env.SMTP_CXC_HOST,
+      port: Number(process.env.SMTP_CXC_PORT) || 587,
+      secure: process.env.SMTP_CXC_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_CXC_USER,
+        pass: process.env.SMTP_CXC_PASS,
+      },
+      from: process.env.SMTP_FROM_CXC || process.env.SMTP_CXC_USER,
+    };
+  }
+
+  const from = profile === 'cxc'
+    ? (process.env.SMTP_FROM_CXC || process.env.SMTP_FROM || process.env.SMTP_USER)
+    : (process.env.SMTP_FROM || process.env.SMTP_USER);
+
+  return {
+    profile: profile === 'cxc' ? 'cxc' : 'default',
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true',
@@ -16,12 +36,29 @@ function createTransport() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    from,
+  };
+}
+
+export function isMailConfigured(profile = 'default') {
+  const cfg = getMailProfileConfig(profile);
+  return Boolean(cfg.host && cfg.auth.user);
+}
+
+export function getMailFrom(profile = 'default') {
+  return getMailProfileConfig(profile).from || '';
+}
+
+function createTransport(profile = 'default') {
+  const cfg = getMailProfileConfig(profile);
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: cfg.auth,
   });
 }
 
-// Datos de auditoría del envío. `meta` permite a cada flujo enriquecer el
-// registro (cliente, contexto, referencia, usuario). El cuerpo, asunto,
-// destinatarios y adjuntos se toman del propio correo.
 async function logEnvio({ to, cc, subject, text, attachments }, meta, { exito, error }) {
   await registrarCorreo({
     cliente: meta?.cliente ?? null,
@@ -39,8 +76,19 @@ async function logEnvio({ to, cc, subject, text, attachments }, meta, { exito, e
   });
 }
 
-export async function sendMail({ to, cc, subject, text, html, attachments, meta }) {
-  if (!isMailConfigured()) {
+export async function sendMail({
+  to,
+  cc,
+  subject,
+  text,
+  html,
+  attachments,
+  meta,
+  mailProfile = 'default',
+}) {
+  const profile = meta?.mailProfile || mailProfile || 'default';
+
+  if (!isMailConfigured(profile)) {
     console.log('[email] SMTP no configurado — omitiendo envío a:', to);
     await logEnvio({ to, cc, subject, text, attachments }, meta, {
       exito: false,
@@ -49,8 +97,9 @@ export async function sendMail({ to, cc, subject, text, html, attachments, meta 
     return { skipped: true };
   }
 
-  const transporter = createTransport();
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const cfg = getMailProfileConfig(profile);
+  const transporter = createTransport(profile);
+  const from = meta?.from || cfg.from;
   const subjectFinal = isPruebas && subject && !subject.startsWith('[PRUEBAS]')
     ? `[PRUEBAS] ${subject}`
     : subject;
@@ -66,9 +115,9 @@ export async function sendMail({ to, cc, subject, text, html, attachments, meta 
 
   try {
     await transporter.sendMail(mailOptions);
-    await saveSentCopy(mailOptions);
+    await saveSentCopy(mailOptions, profile);
     await logEnvio({ to, cc, subject, text, attachments }, meta, { exito: true, error: null });
-    return { sent: true };
+    return { sent: true, from };
   } catch (err) {
     await logEnvio({ to, cc, subject, text, attachments }, meta, {
       exito: false,

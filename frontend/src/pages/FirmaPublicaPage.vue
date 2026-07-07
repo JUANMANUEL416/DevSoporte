@@ -54,6 +54,12 @@
               <div class="text-subtitle2">{{ info.funcionario || 'Funcionario' }}</div>
               <div class="text-caption text-grey">Soporte {{ info.cnssoporte }}</div>
             </template>
+            <template v-else-if="isBitacoraGrupo">
+              <div class="text-subtitle2">{{ info.funcionario || 'Funcionario' }}</div>
+              <div class="text-caption text-grey">
+                {{ info.pendientes }} pendiente(s) · {{ info.soportes?.length || 0 }} soporte(s)
+              </div>
+            </template>
             <template v-else-if="isActproy">
               <div class="text-subtitle2">{{ info.cliente }}</div>
               <div class="text-caption text-grey">Informe {{ info.consecutivo }}</div>
@@ -63,7 +69,28 @@
           <q-separator />
 
           <q-card-section class="q-pt-sm">
-            <div v-if="isBitacora" class="firma-publica__bitacora">
+            <div v-if="isBitacoraGrupo" class="firma-publica__bitacora">
+              <div class="text-body2 q-mb-sm">
+                <div><strong>Cliente:</strong> {{ info.cliente }}</div>
+                <div><strong>Funcionario:</strong> {{ info.funcionario || '—' }}</div>
+              </div>
+              <div class="firma-publica__blocks">
+                <article
+                  v-for="s in info.soportes"
+                  :key="s.cnssoporte"
+                  class="firma-publica__block"
+                  :class="{ 'firma-publica__block--signed': s.firmado }"
+                >
+                  <div class="row items-center q-mb-xs">
+                    <h4 class="q-mr-sm">{{ s.cnssoporte }}</h4>
+                    <q-badge :color="s.firmado ? 'positive' : 'orange'" :label="s.firmado ? 'Firmado' : 'Pendiente'" />
+                  </div>
+                  <p><strong>Fecha:</strong> {{ fmtFecha(s.fecha) }}</p>
+                  <p>{{ s.solicitud || '—' }}</p>
+                </article>
+              </div>
+            </div>
+            <div v-else-if="isBitacora" class="firma-publica__bitacora">
               <div class="text-body2 q-mb-sm">
                 <div><strong>Cliente:</strong> {{ info.cliente }}</div>
                 <div><strong>Fecha soporte:</strong> {{ fmtFecha(info.fecha) }}</div>
@@ -153,7 +180,10 @@
             <q-banner v-else-if="isBitacora && !info.puedeFirmar" dense rounded class="bg-orange-1 text-orange-10 q-mb-md">
               {{ info.bloqueoMotivo || 'No se puede firmar este soporte.' }}
             </q-banner>
-            <q-banner v-else-if="isBitacora && bitacoraDocRechazado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
+            <q-banner v-else-if="isBitacoraGrupo && !info.puedeFirmar" dense rounded class="bg-orange-1 text-orange-10 q-mb-md">
+              {{ info.bloqueoMotivo || 'No hay soportes pendientes de firma.' }}
+            </q-banner>
+            <q-banner v-else-if="isBitacoraAny && bitacoraDocRechazado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
               {{ bitacoraDocMensaje }}
             </q-banner>
             <q-banner v-else-if="info.firmado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
@@ -161,12 +191,12 @@
             </q-banner>
 
             <div
-              v-if="isBitacora && info.puedeFirmar && !info.firmado && !bitacoraDocValidado"
+              v-if="isBitacoraAny && info.puedeFirmar && !(isBitacora && info.firmado) && !bitacoraDocValidado"
               class="q-mb-md"
             >
               <p class="text-body2 q-mb-sm">
-                Ingrese su número de documento para continuar. Solo el funcionario que solicitó el soporte
-                (<strong>{{ info.funcionario || '—' }}</strong>) podrá firmar.
+                Ingrese su número de documento para continuar. Solo el funcionario
+                <strong>{{ info.funcionario || '—' }}</strong> podrá firmar.
               </p>
               <div class="row q-col-gutter-sm items-start">
                 <div class="col-grow">
@@ -192,7 +222,27 @@
             </div>
           </q-card-section>
 
-          <q-card-section v-if="mostrarFirmaBitacora" class="q-pt-none">
+          <q-card-section v-if="mostrarFirmaBitacoraGrupo" class="q-pt-none">
+            <div v-if="soportesPendientes.length > 1" class="q-mb-md">
+              <p class="text-body2 q-mb-sm">Seleccione qué desea firmar:</p>
+              <q-option-group
+                v-model="grupoFirmaModo"
+                :options="grupoFirmaModoOptions"
+                color="primary"
+                dense
+              />
+              <q-select
+                v-if="grupoFirmaModo === 'uno'"
+                v-model="grupoCnssoporteSeleccionado"
+                :options="soportesPendientesOptions"
+                label="Soporte a firmar"
+                outlined
+                dense
+                emit-value
+                map-options
+                class="q-mt-sm"
+              />
+            </div>
             <SignaturePad
               :titulo="signatureTitle"
               height="200px"
@@ -202,7 +252,17 @@
             />
           </q-card-section>
 
-          <q-card-section v-else-if="!isBitacora && !isBitacoraBlocked" class="q-pt-none">
+          <q-card-section v-else-if="mostrarFirmaBitacora" class="q-pt-none">
+            <SignaturePad
+              :titulo="signatureTitle"
+              height="200px"
+              :show-cancel="false"
+              :allow-upload="true"
+              @save="onSave"
+            />
+          </q-card-section>
+
+          <q-card-section v-else-if="!isBitacoraAny && !isBitacoraBlocked" class="q-pt-none">
             <SignaturePad
               :titulo="signatureTitle"
               height="200px"
@@ -243,20 +303,47 @@ const bitacoraDocValidado = ref(false);
 const bitacoraDocRechazado = ref(false);
 const bitacoraDocMensaje = ref('');
 const validandoDocumento = ref(false);
+const grupoFirmaModo = ref('uno');
+const grupoCnssoporteSeleccionado = ref('');
 
 const isInvite = computed(() => info.value?.mode === 'invite');
 const isBitacora = computed(() => info.value?.mode === 'bitacora');
+const isBitacoraGrupo = computed(() => info.value?.mode === 'bitacora_grupo');
+const isBitacoraAny = computed(() => isBitacora.value || isBitacoraGrupo.value);
 const isActproy = computed(() => info.value?.mode === 'actproy');
 const isCapacitacionFirma = computed(() => info.value?.mode === 'firma' || isInvite.value);
-const isBitacoraBlocked = computed(() => isBitacora.value && info.value?.puedeFirmar === false);
+const isBitacoraBlocked = computed(() =>
+  (isBitacora.value || isBitacoraGrupo.value) && info.value?.puedeFirmar === false,
+);
+const soportesPendientes = computed(() =>
+  (info.value?.soportes || []).filter((s) => s.puedeFirmar),
+);
+const soportesPendientesOptions = computed(() =>
+  soportesPendientes.value.map((s) => ({
+    label: `${s.cnssoporte} — ${s.solicitud || 'Soporte'}`,
+    value: s.cnssoporte,
+  })),
+);
+const grupoFirmaModoOptions = computed(() => [
+  { label: 'Firmar un soporte', value: 'uno' },
+  { label: `Firmar todos los pendientes (${soportesPendientes.value.length})`, value: 'todos' },
+]);
 const mostrarFirmaBitacora = computed(() =>
   isBitacora.value
   && info.value?.puedeFirmar
   && !info.value?.firmado
   && bitacoraDocValidado.value,
 );
+const mostrarFirmaBitacoraGrupo = computed(() =>
+  isBitacoraGrupo.value
+  && info.value?.puedeFirmar
+  && bitacoraDocValidado.value
+  && soportesPendientes.value.length > 0
+  && (grupoFirmaModo.value === 'todos' || grupoCnssoporteSeleccionado.value),
+);
 
 const pageTitle = computed(() => {
+  if (isBitacoraGrupo.value) return 'Firmas de aceptación de soporte';
   if (isBitacora.value) return 'Firma aceptación de la solución';
   if (isActproy.value) return 'Firma de aceptación del informe';
   if (isInvite.value) return 'Registro y firma de asistencia';
@@ -264,12 +351,13 @@ const pageTitle = computed(() => {
 });
 
 const signatureTitle = computed(() => (
-  isBitacora.value || isActproy.value
+  isBitacoraAny.value || isActproy.value
     ? 'Diligencie su firma o suba una imagen (PNG/JPG)'
     : 'Diligencie su firma en el recuadro'
 ));
 
 const doneMessage = computed(() => {
+  if (isBitacoraGrupo.value) return 'Las firmas de aceptación fueron registradas correctamente.';
   if (isBitacora.value) return 'Su firma de aceptación fue registrada correctamente.';
   if (isActproy.value) return 'Su firma del informe fue registrada correctamente.';
   if (isInvite.value) return 'Sus datos y firma fueron registrados.';
@@ -283,17 +371,37 @@ function fmtFecha(d) {
   return dt.toLocaleString('es-CO');
 }
 
+async function fetchInfo() {
+  const { data } = await api.get(`/public/firma/${encodeURIComponent(token)}`);
+  info.value = data;
+  if (data.mode === 'bitacora_grupo') {
+    const pending = (data.soportes || []).filter((s) => s.puedeFirmar);
+    grupoCnssoporteSeleccionado.value = pending[0]?.cnssoporte || '';
+    if (pending.length <= 1) grupoFirmaModo.value = 'uno';
+  }
+  return data;
+}
+
 async function loadInfo() {
   loading.value = true;
   error.value = '';
   blocked.value = false;
   blockedMessage.value = '';
+  bitacoraDocValidado.value = false;
+  bitacoraDocRechazado.value = false;
+  bitacoraDocMensaje.value = '';
+  grupoFirmaModo.value = 'uno';
+  grupoCnssoporteSeleccionado.value = '';
   try {
-    const { data } = await api.get(`/public/firma/${encodeURIComponent(token)}`);
-    info.value = data;
+    const data = await fetchInfo();
     if (data.mode === 'actproy' && data.puedeFirmar === false) {
       blocked.value = true;
       blockedMessage.value = data.bloqueoMotivo || 'No se puede firmar.';
+      return;
+    }
+    if (data.mode === 'bitacora_grupo' && data.puedeFirmar === false) {
+      blocked.value = true;
+      blockedMessage.value = data.bloqueoMotivo || 'No hay soportes pendientes de firma.';
       return;
     }
     if (data.mode === 'invite') {
@@ -365,12 +473,34 @@ async function onSave(dataUrl) {
       body = { firma: dataUrl, nombres: form.value.nombres };
     } else if (isBitacora.value) {
       body = { firma: dataUrl, documento: bitacoraDocumento.value.trim() };
+    } else if (isBitacoraGrupo.value) {
+      body = {
+        firma: dataUrl,
+        documento: bitacoraDocumento.value.trim(),
+        firmarTodos: grupoFirmaModo.value === 'todos',
+      };
+      if (grupoFirmaModo.value === 'uno') {
+        body.cnssoporte = grupoCnssoporteSeleccionado.value;
+      }
     } else {
       body = { firma: dataUrl };
     }
-    await api.post(`/public/firma/${encodeURIComponent(token)}`, body);
+    const { data: saved } = await api.post(`/public/firma/${encodeURIComponent(token)}`, body);
+    if (isBitacoraGrupo.value) {
+      const refreshed = await fetchInfo();
+      if (refreshed.pendientes > 0) {
+        $q.notify({
+          type: 'positive',
+          message: saved.message || 'Firma registrada',
+        });
+        return;
+      }
+    }
     done.value = true;
-    $q.notify({ type: 'positive', message: isBitacora.value || isActproy.value ? 'Aceptación firmada' : 'Firma guardada' });
+    $q.notify({
+      type: 'positive',
+      message: isBitacoraAny.value || isActproy.value ? 'Aceptación firmada' : 'Firma guardada',
+    });
   } catch (err) {
     $q.notify({
       type: 'negative',
@@ -424,6 +554,11 @@ onMounted(loadInfo);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.firma-publica__block--signed {
+  opacity: 0.82;
+  background: #f1f8e9;
 }
 
 .firma-publica__rich {

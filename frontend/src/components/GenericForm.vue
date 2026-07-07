@@ -6,8 +6,12 @@
           <q-icon :name="isEdit ? 'edit_note' : 'add_circle'" size="22px" />
         </div>
         <div>
-          <p class="generic-form-card__eyebrow">{{ isEdit ? 'Edición' : 'Nuevo registro' }}</p>
-          <h2 class="generic-form-card__title">{{ module.title }}</h2>
+          <p class="generic-form-card__eyebrow">
+            {{ isDuplicate ? 'Duplicar' : isEdit ? 'Edición' : 'Nuevo registro' }}
+          </p>
+          <h2 class="generic-form-card__title">
+            {{ isDuplicate ? `${module.title} (copia)` : module.title }}
+          </h2>
         </div>
         <q-space />
         <q-btn flat dense round icon="close" class="generic-form-card__close" v-close-popup />
@@ -17,8 +21,15 @@
         <q-form ref="formRef" class="generic-form">
           <div class="row q-col-gutter-md">
             <div v-for="f in visibleFields" :key="f.name" :class="fieldColClass(f)">
+              <VipPlantillaField
+                v-if="f.type === 'vip_plantilla'"
+                v-model="form[f.name]"
+                :label="f.label"
+                :codigo-cliente="form.codigo || ''"
+                class="generic-form__field"
+              />
               <q-input
-                v-if="f.type === 'textarea'"
+                v-else-if="f.type === 'textarea'"
                 v-model="form[f.name]"
                 :label="f.label"
                 type="textarea"
@@ -193,12 +204,14 @@ import LookupSelect from 'components/LookupSelect.vue';
 import ContactosDialogField from 'components/ContactosDialogField.vue';
 import SignaturePad from 'components/SignaturePad.vue';
 import ImageGalleryField from 'components/ImageGalleryField.vue';
+import VipPlantillaField from 'components/VipPlantillaField.vue';
 
 const props = defineProps({
   modelValue: Boolean,
   module: { type: Object, required: true },
   record: { type: Object, default: () => ({}) },
   isEdit: Boolean,
+  isDuplicate: Boolean,
   context: { type: Object, default: () => ({}) },
 });
 const emit = defineEmits(['update:modelValue', 'saved']);

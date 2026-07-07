@@ -43,6 +43,18 @@ async function countBitaCliente(cnsbite, cliente) {
   return res.rows[0]?.total ?? 0;
 }
 
+async function countBitaSinFirma(cnsbite, cliente) {
+  const res = await query(
+    `SELECT COUNT(*)::int AS total FROM bita
+     WHERE cnsbite = $1 AND cliente = $2
+       AND LOWER(COALESCE(estado, '')) = 'terminado'
+       AND (firma IS NULL OR TRIM(firma) = '')
+       AND firma_fecha IS NULL`,
+    [cnsbite, cliente],
+  );
+  return res.rows[0]?.total ?? 0;
+}
+
 async function countBitaPendientes(cnsbite, cliente) {
   const res = await query(
     `SELECT COUNT(*)::int AS total FROM bita
@@ -89,8 +101,14 @@ export async function evaluarCierreSemanaCliente(cnsbite, cliente) {
   }
 
   const pendientes = await countBitaPendientes(cnsbite, cliente);
+  const sinFirma = await countBitaSinFirma(cnsbite, cliente);
   if (pendientes > 0) {
     const err = new Error('Todos los soportes deben estar terminados antes de cerrar la semana');
+    err.status = 400;
+    throw err;
+  }
+  if (sinFirma > 0) {
+    const err = new Error(`Faltan ${sinFirma} soporte(s) por firmar antes de cerrar la semana`);
     err.status = 400;
     throw err;
   }
@@ -103,6 +121,7 @@ export async function getEstadoOpcionesSemanaCliente(cnsbite, cliente) {
   const actual = row?.estado || 'Abierta';
   const total = await countBitaCliente(cnsbite, cliente);
   const pendientes = await countBitaPendientes(cnsbite, cliente);
+  const sinFirma = await countBitaSinFirma(cnsbite, cliente);
 
   let puedeCerrar = actual === 'Abierta';
   let motivoCerrar = '';
@@ -116,6 +135,9 @@ export async function getEstadoOpcionesSemanaCliente(cnsbite, cliente) {
   } else if (pendientes > 0) {
     puedeCerrar = false;
     motivoCerrar = `${pendientes} soporte(s) aún no terminado(s)`;
+  } else if (sinFirma > 0) {
+    puedeCerrar = false;
+    motivoCerrar = `${sinFirma} soporte(s) pendiente(s) de firma`;
   }
 
   return {
@@ -124,6 +146,7 @@ export async function getEstadoOpcionesSemanaCliente(cnsbite, cliente) {
     estado: actual,
     totalSoportes: total,
     pendientes,
+    sinFirma,
     puedeCerrar,
     motivoCerrar,
     fechacierre: row?.fechacierre || null,

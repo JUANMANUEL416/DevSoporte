@@ -3,6 +3,10 @@ import { createRouter, createMemoryHistory, createWebHistory, createWebHashHisto
 import routes from './routes';
 import { useAuthStore } from 'src/stores/auth';
 
+function isAdminArea(path) {
+  return path === '/admin' || path.startsWith('/admin/');
+}
+
 export default route(function () {
   const createHistory = process.env.SERVER
     ? createMemoryHistory
@@ -16,9 +20,7 @@ export default route(function () {
     history: createHistory(process.env.VUE_ROUTER_BASE),
   });
 
-  // Guardia de navegación: exige sesión en las rutas protegidas.
-  Router.beforeEach((to) => {
-    // Enlace de firma por correo (?firma=...) — no requiere login ni menú del sistema.
+  Router.beforeEach((to, from) => {
     if (to.query.firma) {
       return { path: `/firmar/${to.query.firma}` };
     }
@@ -38,6 +40,12 @@ export default route(function () {
     }
     if (to.path === '/login' && auth.isAuthenticated) {
       return { path: '/' };
+    }
+    if (isAdminArea(to.path) && !auth.adminGranted) {
+      return { path: '/' };
+    }
+    if (isAdminArea(from.path) && !isAdminArea(to.path)) {
+      auth.revokeAdmin();
     }
   });
 

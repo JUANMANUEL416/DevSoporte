@@ -5,9 +5,9 @@ function isEnabled() {
   return process.env.SMTP_SAVE_SENT_COPY !== 'false';
 }
 
-function imapHost() {
-  if (process.env.IMAP_HOST) return process.env.IMAP_HOST.trim();
-  const smtp = (process.env.SMTP_HOST || '').trim();
+function imapHost(smtpHost) {
+  if (process.env.IMAP_HOST && !smtpHost) return process.env.IMAP_HOST.trim();
+  const smtp = (smtpHost || process.env.SMTP_HOST || '').trim();
   if (!smtp) return null;
   if (/^smtp\./i.test(smtp)) return smtp.replace(/^smtp\./i, 'mail.');
   return smtp;
@@ -48,23 +48,31 @@ async function resolveSentFolder(client) {
  * Los clientes de correo (Outlook, webmail) no archivan en Enviados
  * los mensajes enviados por SMTP desde aplicaciones externas.
  */
-export async function saveSentCopy(mailOptions) {
+export async function saveSentCopy(mailOptions, profile = 'default') {
   if (!isEnabled()) return { skipped: true, reason: 'disabled' };
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+
+  const useCxc = profile === 'cxc'
+    && process.env.SMTP_CXC_USER
+    && process.env.SMTP_CXC_PASS;
+  const user = (useCxc
+    ? process.env.SMTP_CXC_USER
+    : (process.env.IMAP_USER || process.env.SMTP_USER))?.trim();
+  const pass = (useCxc
+    ? process.env.SMTP_CXC_PASS
+    : (process.env.IMAP_PASS || process.env.SMTP_PASS))?.trim();
+
+  if (!user || !pass) {
     return { skipped: true, reason: 'no-auth' };
   }
 
-  const host = imapHost();
+  const host = imapHost(useCxc ? process.env.SMTP_CXC_HOST : null);
   if (!host) return { skipped: true, reason: 'no-imap-host' };
 
   const client = new ImapFlow({
     host,
     port: Number(process.env.IMAP_PORT) || 993,
     secure: process.env.IMAP_SECURE !== 'false',
-    auth: {
-      user: (process.env.IMAP_USER || process.env.SMTP_USER).trim(),
-      pass: (process.env.IMAP_PASS || process.env.SMTP_PASS).trim(),
-    },
+    auth: { user, pass },
     logger: false,
   });
 

@@ -9,6 +9,11 @@ import {
 } from '../services/firmaEmail.js';
 import { loadInvitePublicContext, registerAsistenteFromInvite } from '../services/registroAsistente.js';
 import { loadBitacoraFirmaContext, saveBitacoraFirma, getBitacoraFirmaEstado, validarDocumentoFirmanteBitacora } from '../services/bitacoraFirma.js';
+import {
+  getBitacoraGrupoFirmaEstado,
+  validarDocumentoFirmanteGrupo,
+  saveBitacoraGrupoFirma,
+} from '../services/bitacoraGrupoFirma.js';
 import { getActproyFirmaEstado, saveActproyFirma } from '../services/actproyFirma.js';
 
 function validateFirmaDataUrl(firma) {
@@ -96,6 +101,22 @@ publicFirmaRouter.get('/:token', async (req, res, next) => {
       });
     }
 
+    if (payload.scope === 'bitacora_firma_grupo') {
+      const estado = await getBitacoraGrupoFirmaEstado(payload);
+      return res.json({
+        mode: 'bitacora_grupo',
+        cnsbite: payload.cnsbite,
+        cliente: estado.cliente,
+        funcionario: estado.funcionario,
+        funcionarioKey: payload.funcionarioKey,
+        soportes: estado.soportes,
+        pendientes: estado.pendientes,
+        puedeFirmar: estado.puedeFirmar,
+        requiereDocumento: true,
+        bloqueoMotivo: estado.bloqueoMotivo || '',
+      });
+    }
+
     if (payload.scope === 'actproy_firma') {
       const estado = await getActproyFirmaEstado(payload.consecutivo);
       if (!estado) return res.status(404).json({ error: 'Informe no encontrado' });
@@ -150,15 +171,22 @@ publicFirmaRouter.get('/:token', async (req, res, next) => {
 publicFirmaRouter.post('/:token/validar-documento', async (req, res, next) => {
   try {
     const payload = verifySigningToken(req.params.token);
-    if (payload.scope !== 'bitacora_firma') {
-      return res.status(400).json({ error: 'Validación de documento no aplica a este enlace' });
-    }
     const documento = String(req.body?.documento || '').trim();
     if (!documento) {
       return res.status(400).json({ valido: false, motivo: 'Ingrese su número de documento' });
     }
-    const result = await validarDocumentoFirmanteBitacora(payload.cnssoporte, documento);
-    res.json(result);
+
+    if (payload.scope === 'bitacora_firma') {
+      const result = await validarDocumentoFirmanteBitacora(payload.cnssoporte, documento);
+      return res.json(result);
+    }
+
+    if (payload.scope === 'bitacora_firma_grupo') {
+      const result = await validarDocumentoFirmanteGrupo(payload, documento);
+      return res.json(result);
+    }
+
+    return res.status(400).json({ error: 'Validación de documento no aplica a este enlace' });
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(410).json({ error: 'El enlace de firma ha expirado' });
@@ -213,6 +241,27 @@ publicFirmaRouter.post('/:token', async (req, res, next) => {
       return res.json({
         ok: true,
         message: 'Firma de aceptación registrada correctamente',
+        firma_fecha: saved.firma_fecha,
+      });
+    }
+
+    if (payload.scope === 'bitacora_firma_grupo') {
+      const documento = String(req.body?.documento || '').trim();
+      if (!documento) {
+        return res.status(400).json({ error: 'Ingrese su número de documento' });
+      }
+      const saved = await saveBitacoraGrupoFirma(payload, firma, {
+        documento,
+        cnssoporte: req.body?.cnssoporte,
+        firmarTodos: Boolean(req.body?.firmarTodos),
+      });
+      return res.json({
+        ok: true,
+        message: saved.firmados > 1
+          ? `${saved.firmados} firmas registradas correctamente`
+          : 'Firma de aceptación registrada correctamente',
+        firmados: saved.firmados,
+        cnssoportes: saved.cnssoportes,
         firma_fecha: saved.firma_fecha,
       });
     }

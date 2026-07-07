@@ -12,6 +12,7 @@
   "dependencies": {
     "@quasar/extras": "^1.16.0",
     "axios": "^1.7.0",
+    "mammoth": "^1.9.0",
     "pdfjs-dist": "^4.9.155",
     "pinia": "^2.1.0",
     "quasar": "^2.16.0",

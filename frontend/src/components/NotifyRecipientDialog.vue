@@ -39,6 +39,39 @@
             />
           </section>
 
+          <section v-if="isVipCuentaCobroMode" class="notify-dialog__section">
+            <q-banner dense rounded class="bg-orange-1 text-orange-10 q-mb-sm">
+              <strong>Enviado desde:</strong> {{ remitenteCxc || 'Configure SMTP_FROM_CXC en el servidor' }}
+              <div class="text-caption q-mt-xs">
+                Remitente distinto al correo de soporte/bitácora (SMTP_FROM).
+              </div>
+            </q-banner>
+            <div class="notify-dialog__section-head">
+              <span class="notify-dialog__section-title">Documentos adjuntos</span>
+            </div>
+            <p class="notify-dialog__empty-hint q-mb-sm">
+              La cuenta de cobro en PDF se adjunta automáticamente. Agregue aquí otros PDF si debe enviarlos con el correo.
+            </p>
+            <q-file
+              v-model="adjuntosCxc"
+              label="Adjuntos adicionales (PDF)"
+              outlined
+              dense
+              multiple
+              append
+              counter
+              hide-bottom-space
+              max-files="10"
+              max-total-size="15728640"
+              accept=".pdf,application/pdf"
+              @rejected="onCxcFilesRejected"
+            >
+              <template #prepend>
+                <q-icon name="attach_file" />
+              </template>
+            </q-file>
+          </section>
+
           <template v-if="isSplitRecipientsMode">
             <div class="notify-dialog__recipients-split">
               <section
@@ -289,6 +322,29 @@
               </div>
             </section>
 
+            <section v-if="isFirmasSemanaMode && firmasGruposPreview.length" class="notify-dialog__section q-mb-sm">
+              <div class="notify-dialog__section-head">
+                <span class="notify-dialog__section-title">
+                  <q-icon name="groups" size="15px" class="q-mr-xs" />
+                  PDF y enlaces por funcionario
+                </span>
+              </div>
+              <div class="notify-dialog__grid">
+                <article
+                  v-for="(g, index) in firmasGruposPreview"
+                  :key="`${g.funcionario}-${index}`"
+                  class="notify-dialog__card notify-dialog__card--selected"
+                >
+                  <div class="notify-dialog__card-text">
+                    <span class="notify-dialog__card-line">{{ g.funcionario }}</span>
+                    <span class="notify-dialog__card-meta">
+                      {{ g.totalSoportes }} soporte(s) · {{ g.pendientesFirma }} pendiente(s) · {{ g.pdfNombre }}
+                    </span>
+                  </div>
+                </article>
+              </div>
+            </section>
+
             <div class="notify-dialog__preview-label">Vista previa</div>
             <pre class="notify-dialog__preview">{{ previewSample }}</pre>
           </section>
@@ -316,7 +372,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import { clientesApi, notificacionApi, bitacoraApi, actproyApi, useResource } from 'src/services/api';
+import { clientesApi, notificacionApi, bitacoraApi, actproyApi, vipClientesApi, vipCuentasCobroApi, useResource } from 'src/services/api';
 import { formatNombreConTratamiento } from 'src/utils/saludo';
 
 const emit = defineEmits(['update:modelValue', 'send']);
@@ -355,6 +411,7 @@ const dragPayload = ref(null);
 const funcionarioSolicitante = ref(null);
 const imagenesSoporte = ref([]);
 const removingImagenIndex = ref(-1);
+const firmasGruposPreview = ref([]);
 const bitApi = useResource('bitacora');
 
 const manualRolOptions = [
@@ -371,21 +428,28 @@ const isActaMode = computed(() => props.notifyType === 'capacitacion');
 const isCronogramaMode = computed(() => props.notifyType === 'cronograma');
 const isBitacoraMode = computed(() => props.notifyType === 'bitacora');
 const isSemanaReportMode = computed(() => props.notifyType === 'bitacora_semana');
+const isFirmasSemanaMode = computed(() => props.notifyType === 'bitacora_firmas_semana');
 const isActproyMode = computed(() => props.notifyType === 'actproy');
+const isVipCuentaCobroMode = computed(() => props.notifyType === 'vip_cuenta_cobro');
 const isSplitRecipientsMode = computed(() =>
   isActaMode.value
   || isCronogramaMode.value
   || isBitacoraMode.value
   || isSemanaReportMode.value
-  || isActproyMode.value,
+  || isFirmasSemanaMode.value
+  || isActproyMode.value
+  || isVipCuentaCobroMode.value,
 );
 const cronogramaTipo = ref('programacion');
 const conSoportes = ref(false);
+const adjuntosCxc = ref([]);
+const pdfCxcFilename = ref('');
+const remitenteCxc = ref('');
 const cronogramaTipoOptions = [
   { label: 'Programación', value: 'programacion' },
   { label: 'Seguimiento', value: 'seguimiento' },
 ];
-const isEquipoOnlyMode = computed(() => isSemanaReportMode.value);
+const isEquipoOnlyMode = computed(() => isSemanaReportMode.value || isFirmasSemanaMode.value);
 
 const allContactos = computed(() => [...contactos.value, ...manualContactos.value]);
 
@@ -441,6 +505,20 @@ const previewSample = computed(() => {
       .join(', ') || '(ninguno)';
     return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF informe firmado)`;
   }
+  if (isVipCuentaCobroMode.value) {
+    const para = allContactosTo.value
+      .filter((c) => selectedTo.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(sin destinatarios)';
+    const copia = [...contactosCc.value, ...manualContactosCc.value]
+      .filter((c) => selectedCc.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(ninguno)';
+    const extraNote = adjuntosCxc.value.length
+      ? `\n\n(Adjuntos extra: ${adjuntosCxc.value.map((f) => f.name).join(', ')})`
+      : '';
+    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: ${pdfCxcFilename.value || 'PDF cuenta de cobro'})${extraNote}`;
+  }
   if (isBitacoraMode.value) {
     const para = allContactosTo.value
       .filter((c) => selectedTo.value.includes(c.email))
@@ -458,6 +536,18 @@ const previewSample = computed(() => {
       .map((c) => c.email)
       .join(', ') || '(sin equipo con email)';
     return `Para: ${para}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF bitácora semanal)`;
+  }
+  if (isFirmasSemanaMode.value) {
+    const para = allContactosTo.value
+      .filter((c) => selectedTo.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(sin equipo con email)';
+    const gruposNote = firmasGruposPreview.value.length
+      ? `\n\nPDF por funcionario:\n${firmasGruposPreview.value.map((g) =>
+        `- ${g.funcionario}: ${g.totalSoportes} soporte(s), ${g.pendientesFirma} pendiente(s)`,
+      ).join('\n')}`
+      : '';
+    return `Para: ${para}\n\nAsunto: ${subject.value}\n\n${body}${gruposNote}\n\n(Adjuntos: PDF por funcionario + enlaces de firma en el correo)`;
   }
   const first = allContactos.value.find((c) => selected.value.includes(c.email)) || { nombre: '' };
   const n = first.nombre || 'estimado(a)';
@@ -543,9 +633,13 @@ watch(
     manualRol.value = 'to';
     cronogramaTipo.value = 'programacion';
     conSoportes.value = false;
+    adjuntosCxc.value = [];
+    pdfCxcFilename.value = '';
+    remitenteCxc.value = '';
     funcionarioSolicitante.value = null;
     imagenesSoporte.value = [];
     removingImagenIndex.value = -1;
+    firmasGruposPreview.value = [];
     try {
       let preview;
       if (isCronogramaMode.value) {
@@ -579,6 +673,33 @@ watch(
         return;
       }
 
+      if (isFirmasSemanaMode.value) {
+        const [destData, previewData] = await Promise.all([
+          clientesApi.destinatarios(props.clienteCodigo),
+          bitacoraApi.previewFirmasSemana(props.recordId, props.clienteCodigo),
+        ]);
+        clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
+        firmasGruposPreview.value = Array.isArray(previewData.grupos) ? previewData.grupos : [];
+        contactosTo.value = (destData.equipoConEmail || []).map((c, i) => ({
+          ...c,
+          id: `to-${i}-${c.email}`,
+        }));
+        contactosCc.value = [];
+        selectedTo.value = contactosTo.value.map((c) => c.email);
+        selectedCc.value = [];
+        defaultSubject.value = previewData.subject || '';
+        defaultBody.value = previewData.body || '';
+        subject.value = previewData.subject || '';
+        bodyText.value = previewData.body || '';
+        if (!contactosTo.value.length) {
+          $q.notify({
+            type: 'warning',
+            message: 'El equipo no tiene correos registrados. Agregue uno manualmente en Para.',
+          });
+        }
+        return;
+      }
+
       if (isActproyMode.value) {
         const [destData, previewData] = await Promise.all([
           clientesApi.destinatarios(props.clienteCodigo),
@@ -603,6 +724,40 @@ watch(
           $q.notify({
             type: 'warning',
             message: 'El cliente no tiene contactos con correo. Agregue uno manualmente en Para.',
+          });
+        }
+        return;
+      }
+
+      if (isVipCuentaCobroMode.value) {
+        const [destData, previewData] = await Promise.all([
+          vipClientesApi.destinatarios(props.clienteCodigo),
+          vipCuentasCobroApi.previewNotificacion(props.recordId),
+        ]);
+        clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
+        pdfCxcFilename.value = previewData.pdfFilename || '';
+        remitenteCxc.value = previewData.remitente || '';
+        defaultSubject.value = previewData.subject || '';
+        defaultBody.value = previewData.body || '';
+        subject.value = previewData.subject || '';
+        bodyText.value = previewData.body || '';
+        contactosTo.value = (destData.contactosConEmail || destData.conEmail || []).map((c, i) => ({
+          ...c,
+          id: `to-${i}-${c.email}`,
+        }));
+        contactosCc.value = [];
+        selectedTo.value = contactosTo.value.map((c) => c.email);
+        selectedCc.value = [];
+        if (!contactosTo.value.length) {
+          $q.notify({
+            type: 'warning',
+            message: 'Indique el email destino en el cliente VIP o agregue un destinatario manual en Para.',
+          });
+        }
+        if (previewData.mailConfigured === false) {
+          $q.notify({
+            type: 'warning',
+            message: 'Configure SMTP_FROM_CXC en el servidor (.env) para el remitente de cuentas de cobro.',
           });
         }
         return;
@@ -868,6 +1023,16 @@ function addManualEmail() {
   manualEmail.value = '';
 }
 
+function onCxcFilesRejected(rejected) {
+  const reason = rejected[0]?.failedPropValidation;
+  const msg = reason === 'max-total-size'
+    ? 'Los adjuntos superan el límite total (15 MB).'
+    : reason === 'max-files'
+      ? 'Máximo 10 adjuntos.'
+      : 'Adjunto no permitido.';
+  $q.notify({ type: 'warning', message: msg });
+}
+
 function confirmSend() {
   if (!canSend.value) return;
   if (isSplitRecipientsMode.value) {
@@ -887,6 +1052,10 @@ function confirmSend() {
     if (isCronogramaMode.value) payload.tipo = cronogramaTipo.value;
     if (isCronogramaMode.value && cronogramaTipo.value === 'seguimiento') {
       payload.conSoportes = conSoportes.value;
+    }
+    if (isVipCuentaCobroMode.value) {
+      emit('send', { payload, files: adjuntosCxc.value || [] });
+      return;
     }
     emit('send', payload);
     return;
