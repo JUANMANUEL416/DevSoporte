@@ -74,6 +74,19 @@ import { beforeSoportCreate, beforeSoportUpdate } from './services/soportHooks.j
 import { beforeDevcambCreate, beforeDevcambUpdate } from './services/devcambHooks.js';
 import { beforeAgconCreate, beforeAgconUpdate } from './services/agendaContactoHooks.js';
 import controlVersionesRoutes from './routes/controlVersiones.js';
+import {
+  vipCuentaCobroPdfHandler,
+  vipCuentaSiguienteNumeroHandler,
+  vipCuentaPreviewHtmlHandler,
+  vipPlantillaVariablesHandler,
+  vipClientePlantillaPreviewHandler,
+  vipClientePlantillaPreviewPdfHandler,
+  vipClienteDestinatariosHandler,
+  vipCuentaPreviewNotificacionHandler,
+  vipCuentaEnviarNotificacionHandler,
+  vipEnviarUpload,
+} from './routes/vipCuentaCobro.js';
+import { beforeVipCuentaCreate, beforeVipCuentaUpdate } from './services/vipCuentaCobro.js';
 
 async function ensureCapacitacionAbierta(cnscapacita) {
   if (!cnscapacita) return;
@@ -170,6 +183,10 @@ const entityHooks = {
     beforeCreate: beforeDevcambCreate,
     beforeUpdate: beforeDevcambUpdate,
   },
+  vip_cuentas_cobro: {
+    beforeCreate: beforeVipCuentaCreate,
+    beforeUpdate: beforeVipCuentaUpdate,
+  },
   temas_capacitacion_items: {
     beforeCreate: beforeTemaItemCreate,
   },
@@ -228,6 +245,20 @@ app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/semanas', requireAuth, semanasRoutes);
 app.use('/api/correos', requireAuth, correosRoutes);
 app.use('/api/control-versiones', requireAuth, controlVersionesRoutes);
+app.get('/api/vip_cuentas_cobro/siguiente-numero', requireAuth, vipCuentaSiguienteNumeroHandler);
+app.get('/api/vip_clientes/plantilla-variables', requireAuth, vipPlantillaVariablesHandler);
+app.get('/api/vip_clientes/:codigo/destinatarios-notificacion', requireAuth, vipClienteDestinatariosHandler);
+app.post('/api/vip_clientes/:codigo/preview-plantilla', requireAuth, vipClientePlantillaPreviewHandler);
+app.post('/api/vip_clientes/:codigo/preview-plantilla-pdf', requireAuth, vipClientePlantillaPreviewPdfHandler);
+app.get('/api/vip_cuentas_cobro/:id/preview-notificacion', requireAuth, vipCuentaPreviewNotificacionHandler);
+app.post(
+  '/api/vip_cuentas_cobro/:id/enviar-notificacion',
+  requireAuth,
+  vipEnviarUpload.array('adjuntos', 10),
+  vipCuentaEnviarNotificacionHandler,
+);
+app.get('/api/vip_cuentas_cobro/:id/preview-html', requireAuth, vipCuentaPreviewHtmlHandler);
+app.get('/api/vip_cuentas_cobro/:id/pdf', requireAuth, vipCuentaCobroPdfHandler);
 
 // Expone la lista de entidades disponibles (útil para el menú dinámico).
 app.get('/api/entities', requireAuth, (req, res) => {

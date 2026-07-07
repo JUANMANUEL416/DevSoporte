@@ -466,6 +466,12 @@ export function bitacoraPdfFileName(encabezado) {
   return `SOPORTE SEMANA DEL ${ini.getDate()} AL ${fin.getDate()} DE ${mes} ${acronym}.pdf`;
 }
 
+export function bitacoraPdfFileNameForFuncionario(encabezado, funcionario) {
+  const base = bitacoraPdfFileName(encabezado).replace(/\.pdf$/i, '');
+  const func = safeName(funcionario || 'FUNCIONARIO').replace(/\s/g, '_').slice(0, 24);
+  return `${base} — ${func}.pdf`;
+}
+
 export function buildBitacoraPdf({ encabezado, soportes }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({

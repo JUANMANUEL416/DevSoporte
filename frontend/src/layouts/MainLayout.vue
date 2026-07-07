@@ -73,9 +73,72 @@
               <q-item-section class="sidebar-item__label">{{ m.title }}</q-item-section>
             </q-item>
           </q-expansion-item>
+
+          <q-item
+            clickable
+            v-ripple
+            class="sidebar-item sidebar-item--administrativo"
+            @click="abrirAccesoAdmin"
+          >
+            <q-item-section avatar>
+              <div class="sidebar-icon sidebar-icon--administrativo">
+                <q-icon name="admin_panel_settings" size="18px" />
+              </div>
+            </q-item-section>
+            <q-item-section class="sidebar-item__label">Administrativo</q-item-section>
+          </q-item>
         </q-list>
       </q-scroll-area>
     </q-drawer>
+
+    <!-- Diálogo de acceso administrativo -->
+    <q-dialog v-model="adminDialogOpen" persistent>
+      <q-card class="admin-dialog">
+        <div class="admin-dialog__header">
+          <q-icon name="admin_panel_settings" size="22px" />
+          <span>Acceso administrativo</span>
+        </div>
+        <q-card-section class="q-pt-md">
+          <p class="text-caption text-grey-7 q-mt-none">
+            Ingrese la clave para acceder al menú administrativo VIP.
+          </p>
+          <q-form @submit="confirmarAccesoAdmin">
+            <q-input
+              v-model="adminClave"
+              :type="adminShowClave ? 'text' : 'password'"
+              label="Clave de acceso"
+              outlined
+              dense
+              autofocus
+              autocomplete="off"
+              :rules="[(v) => !!String(v || '').trim() || 'Requerido']"
+            >
+              <template #append>
+                <q-btn
+                  flat
+                  round
+                  dense
+                  :icon="adminShowClave ? 'visibility_off' : 'visibility'"
+                  @click="adminShowClave = !adminShowClave"
+                />
+              </template>
+            </q-input>
+            <div class="row justify-end q-gutter-sm q-mt-md">
+              <q-btn flat no-caps label="Cancelar" color="grey-7" :disable="adminLoading" v-close-popup />
+              <q-btn
+                unelevated
+                no-caps
+                color="primary"
+                label="Entrar"
+                icon="lock_open"
+                :loading="adminLoading"
+                type="submit"
+              />
+            </div>
+          </q-form>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
 
     <q-page-container>
       <router-view />
@@ -86,13 +149,15 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useQuasar } from 'quasar';
 import { useAuthStore } from 'src/stores/auth';
 import { modulesByGroup } from 'src/config/modules';
-import { appApi } from 'src/services/api';
+import { appApi, authApi } from 'src/services/api';
 
 const drawer = ref(true);
 const auth = useAuthStore();
 const router = useRouter();
+const $q = useQuasar();
 const appVersion = process.env.APP_VERSION || '0.0.0';
 const runtime = ref({
   isPruebas: false,
@@ -104,6 +169,35 @@ const groups = modulesByGroup();
 const expandedGroups = ref(
   Object.fromEntries(Object.keys(groups).map((group) => [group, true])),
 );
+
+// Acceso administrativo
+const adminDialogOpen = ref(false);
+const adminClave = ref('');
+const adminShowClave = ref(false);
+const adminLoading = ref(false);
+
+async function abrirAccesoAdmin() {
+  adminClave.value = '';
+  adminShowClave.value = false;
+  adminDialogOpen.value = true;
+}
+
+async function confirmarAccesoAdmin() {
+  adminLoading.value = true;
+  try {
+    await authApi.validarAdmin(adminClave.value);
+    auth.grantAdmin();
+    adminDialogOpen.value = false;
+    router.push('/admin');
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudo validar la clave',
+    });
+  } finally {
+    adminLoading.value = false;
+  }
+}
 
 const groupIcons = {
   Configuración: 'settings',
@@ -349,6 +443,44 @@ onMounted(async () => {
       background: linear-gradient(90deg, #eceff1 0%, #cfd8dc 100%);
     }
   }
+}
+
+.sidebar-item--administrativo {
+  margin-top: 6px;
+  background: linear-gradient(90deg, #fff3e0 0%, #ffe0b2 100%);
+  border-color: #ffcc80;
+
+  &::before,
+  &::after {
+    left: 38px;
+  }
+
+  &:hover {
+    border-color: #fb8c00;
+    transform: translateX(2px);
+  }
+}
+
+.sidebar-icon--administrativo {
+  background: linear-gradient(90deg, #ffe0b2 0%, #ffb74d 100%);
+  border-color: #ffb74d;
+  color: #e65100;
+}
+
+.admin-dialog {
+  width: min(420px, 94vw);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.admin-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  background: linear-gradient(90deg, #ef6c00 0%, #e65100 100%);
+  color: #fff;
+  font-weight: 700;
 }
 
 .sidebar-item__label {

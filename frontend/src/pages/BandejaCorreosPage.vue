@@ -90,6 +90,21 @@
             <q-badge :color="contextoColor(props.row.contexto)" :label="contextoLabel(props.row.contexto)" />
           </q-td>
         </template>
+        <template #body-cell-acciones="props">
+          <q-td :props="props" @click.stop>
+            <q-btn
+              v-if="puedeReenviar(props.row)"
+              flat
+              dense
+              round
+              color="primary"
+              icon="forward"
+              @click="abrirReenviar(props.row)"
+            >
+              <q-tooltip>Reenviar</q-tooltip>
+            </q-btn>
+          </q-td>
+        </template>
         <template #no-data>
           <div class="full-width text-center text-grey-6 q-pa-md">Sin correos registrados.</div>
         </template>
@@ -101,12 +116,56 @@
       <q-card class="bandeja-compose">
         <div class="bandeja-card__header bandeja-card__header--compact">
           <q-icon name="edit_note" size="18px" />
-          <span>Nuevo correo</span>
+          <span>{{ composeMode === 'reenviar' ? 'Reenviar correo' : 'Nuevo correo' }}</span>
           <q-space />
           <q-btn flat dense round size="sm" icon="close" color="white" :disable="sending" v-close-popup />
         </div>
 
         <div class="bandeja-compose__body">
+          <section
+            v-if="composeMode === 'reenviar' && reenviarAdjuntosRequeridos.length"
+            class="bandeja-compose__adjuntos-req"
+          >
+            <div class="bandeja-compose__adjuntos-req-head">
+              <q-icon name="attach_file" size="16px" />
+              <span>Adjuntos requeridos para reenviar</span>
+            </div>
+            <p class="bandeja-compose__adjuntos-req-hint">
+              Debe adjuntar cada archivo con el <strong>mismo nombre y extensión</strong> del correo original.
+            </p>
+            <div
+              v-for="(req, index) in reenviarAdjuntosRequeridos"
+              :key="`${req.filename}-${index}`"
+              class="bandeja-compose__adjunto-req-row"
+              :class="{ 'bandeja-compose__adjunto-req-row--ok': req.file }"
+            >
+              <div class="bandeja-compose__adjunto-req-meta">
+                <q-icon
+                  :name="req.file ? 'check_circle' : 'radio_button_unchecked'"
+                  :color="req.file ? 'positive' : 'grey-6'"
+                  size="18px"
+                />
+                <span class="bandeja-compose__adjunto-req-name">{{ req.filename }}</span>
+              </div>
+              <q-file
+                :model-value="req.file"
+                outlined
+                dense
+                hide-bottom-space
+                :label="req.file ? req.file.name : 'Seleccionar archivo'"
+                class="bandeja-compose__adjunto-req-file"
+                @update:model-value="(f) => onReenviarAdjuntoSelected(index, f)"
+              >
+                <template #prepend>
+                  <q-icon name="upload_file" />
+                </template>
+                <template v-if="req.file" #append>
+                  <q-btn flat dense round icon="close" @click.stop="quitarReenviarAdjunto(index)" />
+                </template>
+              </q-file>
+            </div>
+          </section>
+
           <div class="bandeja-compose__recipients-row">
             <div class="bandeja-compose__top-row">
               <q-select
@@ -299,6 +358,7 @@
             <q-input v-model="asunto" label="Asunto *" outlined dense hide-bottom-space />
 
             <q-file
+              v-if="!(composeMode === 'reenviar' && reenviarAdjuntosRequeridos.length)"
               v-model="adjuntos"
               label="Adjuntos"
               outlined
@@ -350,9 +410,16 @@
               <div><strong>Para:</strong> {{ selectedParaPreview || '(sin destinatarios)' }}</div>
               <div v-if="selectedCcPreview"><strong>CC:</strong> {{ selectedCcPreview }}</div>
               <div><strong>Asunto:</strong> {{ asunto || '(sin asunto)' }}</div>
-              <div v-if="adjuntos && adjuntos.length">
+              <div v-if="adjuntosPreview.length">
                 <strong>Adjuntos:</strong>
-                <q-chip v-for="(f, i) in adjuntos" :key="i" dense icon="attach_file" :label="f.name" />
+                <q-chip
+                  v-for="(f, i) in adjuntosPreview"
+                  :key="i"
+                  dense
+                  icon="attach_file"
+                  :label="f.label"
+                  :color="f.ok === false ? 'orange-2' : undefined"
+                />
               </div>
             </div>
             <!-- eslint-disable-next-line vue/no-v-html -->
@@ -372,12 +439,14 @@
             :loading="sending"
             :disable="!canSend"
             @click="enviar"
-          />
+          >
+            <q-tooltip v-if="!canSend && composeMode === 'reenviar' && !adjuntosReenvioCompletos">
+              Adjunte todos los archivos con el nombre y extensión originales
+            </q-tooltip>
+          </q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
-
-    <!-- ----------------------- Agenda de contactos ----------------------- -->
     <q-dialog v-model="agendaOpen">
       <q-card class="bandeja-agenda">
         <div class="bandeja-card__header bandeja-card__header--compact">
@@ -626,7 +695,28 @@
           <q-separator class="q-my-sm" />
           <div class="bandeja-detalle__label">Mensaje</div>
           <pre class="bandeja-detalle__body">{{ detalle.cuerpo || '(sin contenido)' }}</pre>
+          <q-banner
+            v-if="detalle && !puedeReenviar(detalle)"
+            dense
+            rounded
+            class="bg-grey-2 text-grey-9 q-mt-sm"
+          >
+            Este correo fue generado desde <strong>{{ contextoLabel(detalle.contexto) }}</strong>.
+            Para volver a enviarlo, use el módulo correspondiente (puede regenerar PDF y adjuntos allí).
+          </q-banner>
         </q-card-section>
+        <q-card-actions v-if="detalle" align="right" class="bandeja-detalle__actions">
+          <q-btn
+            v-if="puedeReenviar(detalle)"
+            flat
+            no-caps
+            icon="forward"
+            label="Reenviar"
+            color="primary"
+            @click="abrirReenviar(detalle)"
+          />
+          <q-btn flat no-caps label="Cerrar" v-close-popup />
+        </q-card-actions>
       </q-card>
     </q-dialog>
   </q-page>
@@ -653,6 +743,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // --- Compose ---
 const composeOpen = ref(false);
+const composeMode = ref('nuevo');
+const reenviarAdjuntosRequeridos = ref([]);
 const cliente = ref(null);
 const clienteNombre = ref('');
 const contactosTo = ref([]);
@@ -952,9 +1044,29 @@ function resizeCuerpoTextarea() {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-function abrirNuevo() {
-  cliente.value = null;
-  clienteNombre.value = '';
+function parseEmailList(text) {
+  if (!text) return [];
+  return [
+    ...new Set(
+      String(text)
+        .split(/[,;]+/)
+        .map((e) => e.trim())
+        .filter((e) => EMAIL_RE.test(e)),
+    ),
+  ];
+}
+
+function parseAdjuntosMeta(raw) {
+  if (!raw) return [];
+  try {
+    const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function resetComposeRecipients() {
   contactosTo.value = [];
   contactosCc.value = [];
   manualContactosTo.value = [];
@@ -963,6 +1075,46 @@ function abrirNuevo() {
   selectedCc.value = [];
   manualEmail.value = '';
   manualRol.value = 'to';
+}
+
+function normalizeAdjuntoNombre(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function archivoCoincideRequerido(file, requiredFilename) {
+  if (!file || !requiredFilename) return false;
+  return normalizeAdjuntoNombre(file.name) === normalizeAdjuntoNombre(requiredFilename);
+}
+
+function onReenviarAdjuntoSelected(index, file) {
+  const req = reenviarAdjuntosRequeridos.value[index];
+  if (!req) return;
+  if (!file) {
+    req.file = null;
+    return;
+  }
+  if (!archivoCoincideRequerido(file, req.filename)) {
+    $q.notify({
+      type: 'warning',
+      message: `El archivo debe llamarse exactamente "${req.filename}" (mismo nombre y extensión).`,
+    });
+    req.file = null;
+    return;
+  }
+  req.file = file;
+}
+
+function quitarReenviarAdjunto(index) {
+  const req = reenviarAdjuntosRequeridos.value[index];
+  if (req) req.file = null;
+}
+
+function abrirNuevo() {
+  composeMode.value = 'nuevo';
+  reenviarAdjuntosRequeridos.value = [];
+  resetComposeRecipients();
+  cliente.value = null;
+  clienteNombre.value = '';
   asunto.value = ASUNTO_DEFAULT;
   adjuntos.value = [];
   const tpl = buildPlantilla('');
@@ -971,6 +1123,71 @@ function abrirNuevo() {
   composeOpen.value = true;
   nextTick(resizeCuerpoTextarea);
   loadEquipoAgendaToCc();
+}
+
+function puedeReenviar(row) {
+  return (row?.contexto || '') === 'bandeja';
+}
+
+async function abrirReenviar(row) {
+  if (!row) return;
+  if (!puedeReenviar(row)) {
+    $q.notify({
+      type: 'info',
+      message: 'Solo se pueden reenviar correos elaborados manualmente en la bandeja. Use el módulo de origen para volver a enviar.',
+    });
+    return;
+  }
+  let data = row;
+  if (!row.cuerpo) {
+    try {
+      data = await correosApi.get(row.id);
+    } catch {
+      /* datos de la fila */
+    }
+  }
+
+  composeMode.value = 'reenviar';
+  reenviarAdjuntosRequeridos.value = parseAdjuntosMeta(data.adjuntos).map((a) => ({
+    filename: a.filename || 'adjunto',
+    file: null,
+  }));
+  resetComposeRecipients();
+  detalleOpen.value = false;
+
+  cliente.value = data.cliente || null;
+  clienteNombre.value = data.nombrecliente || '';
+  asunto.value = data.asunto || ASUNTO_DEFAULT;
+  cuerpo.value = data.cuerpo || '';
+  plantillaSnapshot.value = cuerpo.value;
+  adjuntos.value = [];
+
+  const paraEmails = parseEmailList(data.para);
+  const ccEmails = parseEmailList(data.cc);
+  manualContactosTo.value = paraEmails.map((email, i) => ({
+    id: `r-to-${i}-${email}`,
+    email,
+    nombre: email,
+    manual: true,
+  }));
+  manualContactosCc.value = ccEmails.map((email, i) => ({
+    id: `r-cc-${i}-${email}`,
+    email,
+    nombre: email,
+    manual: true,
+  }));
+  selectedTo.value = [...paraEmails];
+  selectedCc.value = [...ccEmails];
+
+  composeOpen.value = true;
+  nextTick(resizeCuerpoTextarea);
+
+  if (!paraEmails.length) {
+    $q.notify({
+      type: 'warning',
+      message: 'El correo original no tiene destinatarios válidos en Para. Agregue al menos uno.',
+    });
+  }
 }
 
 function agendaEntryFromRow(c) {
@@ -1080,8 +1297,30 @@ function restaurarPlantilla() {
   nextTick(resizeCuerpoTextarea);
 }
 
+const adjuntosReenvioCompletos = computed(() => {
+  if (composeMode.value !== 'reenviar' || !reenviarAdjuntosRequeridos.value.length) return true;
+  return reenviarAdjuntosRequeridos.value.every(
+    (r) => r.file && archivoCoincideRequerido(r.file, r.filename),
+  );
+});
+
+const adjuntosPreview = computed(() => {
+  if (composeMode.value === 'reenviar' && reenviarAdjuntosRequeridos.value.length) {
+    return reenviarAdjuntosRequeridos.value.map((r) => ({
+      label: r.file ? r.filename : `${r.filename} (pendiente)`,
+      ok: Boolean(r.file),
+    }));
+  }
+  return (adjuntos.value || []).map((f) => ({ label: f.name, ok: true }));
+});
+
 const canSend = computed(
-  () => !sending.value && asunto.value.trim() && cuerpo.value.trim() && selectedTo.value.length > 0,
+  () =>
+    !sending.value
+    && asunto.value.trim()
+    && cuerpo.value.trim()
+    && selectedTo.value.length > 0
+    && adjuntosReenvioCompletos.value,
 );
 
 // --- Vista previa (réplica del HTML que arma el backend) ---
@@ -1281,6 +1520,26 @@ function onFilesRejected(rejected) {
 
 async function enviar() {
   if (!canSend.value) return;
+  if (composeMode.value === 'reenviar' && reenviarAdjuntosRequeridos.value.length) {
+    const faltantes = reenviarAdjuntosRequeridos.value.filter((r) => !r.file);
+    if (faltantes.length) {
+      $q.notify({
+        type: 'warning',
+        message: `Faltan ${faltantes.length} adjunto(s) requerido(s)`,
+      });
+      return;
+    }
+    const invalidos = reenviarAdjuntosRequeridos.value.filter(
+      (r) => !archivoCoincideRequerido(r.file, r.filename),
+    );
+    if (invalidos.length) {
+      $q.notify({
+        type: 'warning',
+        message: 'Todos los adjuntos deben conservar el mismo nombre y extensión del correo original',
+      });
+      return;
+    }
+  }
   sending.value = true;
   try {
     const fd = new FormData();
@@ -1289,10 +1548,16 @@ async function enviar() {
     fd.append('cuerpo', cuerpo.value);
     fd.append('para', JSON.stringify(selectedTo.value));
     if (selectedCc.value.length) fd.append('cc', JSON.stringify(selectedCc.value));
-    for (const file of adjuntos.value || []) fd.append('adjuntos', file);
+    const filesToSend = composeMode.value === 'reenviar' && reenviarAdjuntosRequeridos.value.length
+      ? reenviarAdjuntosRequeridos.value.map((r) => r.file).filter(Boolean)
+      : (adjuntos.value || []);
+    for (const file of filesToSend) fd.append('adjuntos', file);
 
     await correosApi.enviar(fd);
-    $q.notify({ type: 'positive', message: 'Correo enviado correctamente.' });
+    $q.notify({
+      type: 'positive',
+      message: composeMode.value === 'reenviar' ? 'Correo reenviado correctamente.' : 'Correo enviado correctamente.',
+    });
     composeOpen.value = false;
     reload();
   } catch (err) {
@@ -1323,6 +1588,7 @@ const contextoOptions = [
   { label: 'Capacitación', value: 'capacitacion' },
   { label: 'Bitácora', value: 'bitacora' },
   { label: 'Bitácora semanal', value: 'bitacora_semana' },
+  { label: 'Firmas semana', value: 'bitacora_firmas_semana' },
   { label: 'Firma', value: 'firma' },
   { label: 'Informe actividades', value: 'actproy' },
   { label: 'Invitación', value: 'invitacion' },
@@ -1338,6 +1604,7 @@ const columns = [
   { name: 'num_destinatarios', label: 'Dest.', field: 'num_destinatarios', align: 'center' },
   { name: 'exito', label: 'Estado', field: 'exito', align: 'center' },
   { name: 'usuario', label: 'Usuario', field: 'usuario', align: 'left' },
+  { name: 'acciones', label: '', field: 'id', align: 'center', style: 'width: 48px' },
 ];
 
 async function onRequest(props) {
@@ -1406,6 +1673,7 @@ function contextoColor(ctx) {
     capacitacion: 'blue',
     bitacora: 'teal',
     bitacora_semana: 'cyan',
+    bitacora_firmas_semana: 'deep-purple',
     firma: 'deep-purple',
     actproy: 'purple',
     invitacion: 'orange',
@@ -1498,6 +1766,69 @@ onMounted(async () => {
   gap: 10px;
   padding: 10px 12px;
   background: #f8fafc;
+}
+
+.bandeja-compose__adjuntos-req {
+  padding: 10px 12px;
+  border: 1px solid #bbdefb;
+  border-radius: 10px;
+  background: #e3f2fd;
+}
+
+.bandeja-compose__adjuntos-req-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0d47a1;
+  margin-bottom: 4px;
+}
+
+.bandeja-compose__adjuntos-req-hint {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: #1565c0;
+  line-height: 1.4;
+}
+
+.bandeja-compose__adjunto-req-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: 1px solid #90caf9;
+  border-radius: 8px;
+  background: #fff;
+
+  &--ok {
+    border-color: #81c784;
+    background: #f1f8e9;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.bandeja-compose__adjunto-req-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bandeja-compose__adjunto-req-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1e293b;
+  word-break: break-all;
+}
+
+.bandeja-compose__adjunto-req-file {
+  min-width: 0;
 }
 
 .bandeja-compose__recipients-row {
@@ -1865,6 +2196,11 @@ onMounted(async () => {
   overflow: auto;
 }
 
+.bandeja-detalle__actions {
+  padding: 8px 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
 .bandeja-plantilla-shell :deep(.q-dialog__inner) {
   padding: 8px;
 }
@@ -1980,6 +2316,10 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
+  .bandeja-compose__adjunto-req-row {
+    grid-template-columns: 1fr;
+  }
+
   .bandeja-compose__recipients {
     grid-template-columns: 1fr;
   }

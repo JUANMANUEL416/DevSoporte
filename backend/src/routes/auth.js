@@ -69,6 +69,19 @@ router.post('/recuperar-clave/:token', async (req, res, next) => {
   }
 });
 
+// Acceso al menú administrativo (clave fija en ADMIN_ACCESS_KEY).
+router.post('/admin-acceso', requireAuth, (req, res) => {
+  const esperada = process.env.ADMIN_ACCESS_KEY || '';
+  const recibida = String(req.body?.clave || '');
+  if (!esperada) {
+    return res.status(503).json({ error: 'No se configuró la clave de acceso administrativo.' });
+  }
+  if (recibida !== esperada) {
+    return res.status(403).json({ error: 'Clave incorrecta' });
+  }
+  res.json({ ok: true });
+});
+
 // Datos del usuario autenticado.
 router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user });

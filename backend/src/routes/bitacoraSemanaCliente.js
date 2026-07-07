@@ -7,6 +7,8 @@ import {
 import {
   previewNotificacionSemanaCliente,
   enviarNotificacionSemanaCliente,
+  previewNotificacionFirmasSemanaCliente,
+  enviarFirmasSemanaCliente,
 } from '../services/notificacionEmail.js';
 
 const router = Router();
@@ -53,6 +55,32 @@ router.get('/semana/:cnsbite/cliente/:cliente/preview-reporte', async (req, res,
 router.post('/semana/:cnsbite/cliente/:cliente/enviar-reporte', async (req, res, next) => {
   try {
     const result = await enviarNotificacionSemanaCliente(
+      req.params.cnsbite,
+      req.params.cliente,
+      req.body || {},
+      req.user?.usuario,
+    );
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.get('/semana/:cnsbite/cliente/:cliente/preview-firmas', async (req, res, next) => {
+  try {
+    const data = await previewNotificacionFirmasSemanaCliente(req.params.cnsbite, req.params.cliente);
+    res.json(data);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.post('/semana/:cnsbite/cliente/:cliente/enviar-firmas', async (req, res, next) => {
+  try {
+    const result = await enviarFirmasSemanaCliente(
       req.params.cnsbite,
       req.params.cliente,
       req.body || {},

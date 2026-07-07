@@ -52,6 +52,12 @@ export function verifySigningToken(token) {
     if (!payload.cnssoporte) throw new Error('Token inválido');
     return payload;
   }
+  if (payload.scope === 'bitacora_firma_grupo') {
+    if (!payload.cnsbite || !payload.cliente || !payload.funcionarioKey || !Array.isArray(payload.cnssoportes)) {
+      throw new Error('Token inválido');
+    }
+    return payload;
+  }
   if (payload.scope === 'actproy_firma') {
     if (!payload.consecutivo) throw new Error('Token inválido');
     return payload;
@@ -80,6 +86,21 @@ export function createBitacoraFirmaToken({ cnssoporte, documento }) {
   };
   if (documento) payload.documento = String(documento);
   return jwt.sign(payload, SECRET, { expiresIn: `${days}d` });
+}
+
+export function createBitacoraGrupoFirmaToken({ cnsbite, cliente, funcionarioKey, cnssoportes }) {
+  const days = Number(process.env.SIGNING_TOKEN_EXPIRES_DAYS) || 14;
+  return jwt.sign(
+    {
+      scope: 'bitacora_firma_grupo',
+      cnsbite: String(cnsbite),
+      cliente: String(cliente),
+      funcionarioKey: String(funcionarioKey),
+      cnssoportes: cnssoportes.map(String),
+    },
+    SECRET,
+    { expiresIn: `${days}d` },
+  );
 }
 
 export function createActproyFirmaToken({ consecutivo }) {

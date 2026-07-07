@@ -17,6 +17,12 @@ import {
   loadFuncionarioDestinatario,
   hasFirmaAceptacion,
 } from './bitacoraFirma.js';
+import {
+  evaluarEnvioFirmasSemanaCliente,
+  buildGrupoPdfAttachment,
+  createBitacoraGrupoFirmaLink,
+  displayFuncionarioKey,
+} from './bitacoraGrupoFirma.js';
 import { formatNombreConTratamiento } from './saludo.js';
 import { buildImagenesEmailPayload, parseImagenesSoporte } from './bitacoraImagenes.js';
 import {
@@ -841,6 +847,196 @@ export async function enviarNotificacionSemanaCliente(cnsbite, cliente, body = {
       cliente,
       nombrecliente: clienteRow?.nombrecliente || null,
       contexto: 'bitacora_semana',
+      referencia: cnsbite,
+      usuario,
+    },
+  });
+}
+
+async function buildGruposFirmaSemanaData(cnsbite, cliente) {
+  const evaluacion = await evaluarEnvioFirmasSemanaCliente(cnsbite, cliente);
+  if (!evaluacion.pendientes.length) {
+    const err = new Error('Todos los soportes terminados ya están firmados');
+    err.status = 400;
+    throw err;
+  }
+
+  const data = await fetchBitacoraSemanaCliente(cnsbite, cliente);
+  if (!data) {
+    const err = new Error('Semana o cliente no encontrado');
+    err.status = 404;
+    throw err;
+  }
+
+  const grupos = [];
+  for (const g of evaluacion.groups) {
+    const cnssoportes = g.items.map((i) => i.cnssoporte);
+    const pendientesFirma = g.items.filter((s) => !hasFirmaAceptacion(s)).length;
+    const firmados = g.items.length - pendientesFirma;
+    const pdf = await buildGrupoPdfAttachment(cnsbite, cliente, g);
+    const linkFirma = createBitacoraGrupoFirmaLink({
+      cnsbite,
+      cliente,
+      funcionarioKey: g.funcionarioKey,
+      cnssoportes,
+    });
+    grupos.push({
+      funcionario: g.funcionario || displayFuncionarioKey(g.funcionarioKey),
+      funcionarioKey: g.funcionarioKey,
+      totalSoportes: g.items.length,
+      pendientesFirma,
+      firmados,
+      pdfNombre: pdf.filename,
+      linkFirma,
+      pdf,
+    });
+  }
+
+  return { evaluacion, data, grupos };
+}
+
+function buildFirmasSemanaClienteEmailBundle(encabezado, clienteRow, bodyTemplate, { grupos, pdfFilenames, idsemana } = {}) {
+  const nombreCliente = clienteRow?.nombrecliente || encabezado?.nombrecliente || encabezado?.cliente || '—';
+  const subject = `Firmas pendientes — Semana ${idsemana || encabezado?.idsemana || ''} — ${nombreCliente}`;
+  const defaultBody = `Hola {{nombre}},
+
+Adjuntamos los PDF de soporte de la semana ${idsemana || encabezado?.idsemana || ''} para ${nombreCliente}, agrupados por funcionario solicitante.
+
+Cada funcionario debe firmar sus soportes con el enlace correspondiente (documento de identidad requerido). Los soportes ya firmados no pueden volver a firmarse.`;
+  const introTemplate = extractIntroFromBody(String(bodyTemplate || '').trim() || defaultBody, defaultBody);
+  const rows = [
+    { label: 'Cliente', value: nombreCliente },
+    { label: 'Semana', value: idsemana || encabezado?.idsemana || '—' },
+    { label: 'Consecutivo', value: encabezado?.cnsbite || '—' },
+    { label: 'Periodo', value: `${fmtFecha(encabezado?.fechaini)} — ${fmtFecha(encabezado?.fechafin)}` },
+    { label: 'Funcionarios', value: String(grupos?.length || 0) },
+    { label: 'Pendientes de firma', value: String(grupos?.reduce((n, g) => n + g.pendientesFirma, 0) || 0) },
+  ];
+  const linkRows = (grupos || [])
+    .filter((g) => g.pendientesFirma > 0)
+    .map((g) => ({
+      label: `${g.funcionario} (${g.pendientesFirma} pend.)`,
+      href: g.linkFirma,
+    }));
+  const calloutText = pdfFilenames?.length
+    ? `Adjuntos: ${pdfFilenames.join(', ')}`
+    : 'Los PDF por funcionario van incluidos en este correo.';
+
+  return {
+    subject,
+    body: applyNombreTemplate(introTemplate, '{{nombre}}'),
+    buildForRecipient(destinatario) {
+      const saludo = destinatario?.nombre || 'estimado(a)';
+      const introText = stripLeadingGreeting(applyNombreTemplate(introTemplate, saludo));
+      const greeting = `Hola ${saludo},`;
+      const html = buildNotificationEmailHtml({
+        preheader: `Firmas pendientes — ${nombreCliente}`,
+        title: 'Solicitud de firmas de soporte',
+        subtitle: nombreCliente,
+        badge: 'Firmas',
+        accent: '#00897b',
+        greeting,
+        introText,
+        rows,
+        linkRows,
+        calloutTitle: 'Documentos adjuntos',
+        calloutText,
+        footerNote: 'Comparta cada enlace con el funcionario correspondiente. Los soportes ya firmados no admiten cambios.',
+      });
+      const plainLinks = linkRows.map((r) => `${r.label}: ${r.href}`).join('\n');
+      const text = buildPlainNotificationEmail({
+        greeting,
+        introText,
+        rows,
+        calloutText: `${calloutText}${plainLinks ? `\n\nEnlaces de firma:\n${plainLinks}` : ''}`,
+      });
+      return { text, html };
+    },
+  };
+}
+
+export async function previewNotificacionFirmasSemanaCliente(cnsbite, cliente) {
+  const biteClie = await getBiteClie(cnsbite, cliente);
+  if ((biteClie?.estado || 'Abierta') !== 'Abierta') {
+    const err = new Error('Solo se pueden enviar firmas mientras la semana del cliente está abierta');
+    err.status = 400;
+    throw err;
+  }
+
+  const { data, grupos } = await buildGruposFirmaSemanaData(cnsbite, cliente);
+  const clienteRow = await loadCliente(cliente);
+  const bundle = buildFirmasSemanaClienteEmailBundle(
+    data.encabezado,
+    clienteRow,
+    '',
+    {
+      grupos,
+      pdfFilenames: grupos.map((g) => g.pdfNombre),
+      idsemana: data.encabezado.idsemana,
+    },
+  );
+
+  return {
+    subject: bundle.subject,
+    body: bundle.body,
+    grupos: grupos.map((g) => ({
+      funcionario: g.funcionario,
+      totalSoportes: g.totalSoportes,
+      pendientesFirma: g.pendientesFirma,
+      firmados: g.firmados,
+      pdfNombre: g.pdfNombre,
+      linkFirma: g.linkFirma,
+    })),
+  };
+}
+
+export async function enviarFirmasSemanaCliente(cnsbite, cliente, body = {}, usuario = null) {
+  const biteClie = await getBiteClie(cnsbite, cliente);
+  if ((biteClie?.estado || 'Abierta') !== 'Abierta') {
+    const err = new Error('Solo se pueden enviar firmas mientras la semana del cliente está abierta');
+    err.status = 400;
+    throw err;
+  }
+
+  const { data, grupos } = await buildGruposFirmaSemanaData(cnsbite, cliente);
+  const clienteRow = await loadCliente(cliente);
+  const toEmails = collectEmailList(body, 'emails', 'extraEmails');
+  if (!toEmails.length) {
+    const err = new Error('Seleccione al menos un destinatario del equipo (Para)');
+    err.status = 400;
+    throw err;
+  }
+
+  const toList = resolveEquipoDestinatarios(clienteRow, toEmails);
+  const attachments = grupos.map((g) => ({
+    filename: g.pdf.filename,
+    content: g.pdf.content,
+    contentType: 'application/pdf',
+  }));
+  const bundle = buildFirmasSemanaClienteEmailBundle(
+    data.encabezado,
+    clienteRow,
+    String(body.body || '').trim(),
+    {
+      grupos,
+      pdfFilenames: grupos.map((g) => g.pdfNombre),
+      idsemana: data.encabezado.idsemana,
+    },
+  );
+  const subject = String(body.subject || '').trim() || bundle.subject;
+
+  return sendActaCapacitacionEmail({
+    toList,
+    ccList: [],
+    subject,
+    buildMessage: () => bundle.buildForRecipient({
+      nombre: toList[0]?.nombre || 'equipo',
+    }),
+    attachments,
+    meta: {
+      cliente,
+      nombrecliente: clienteRow?.nombrecliente || null,
+      contexto: 'bitacora_firmas_semana',
       referencia: cnsbite,
       usuario,
     },

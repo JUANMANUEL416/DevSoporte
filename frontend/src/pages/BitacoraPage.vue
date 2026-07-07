@@ -244,6 +244,23 @@
                         v-if="!isSemanaClienteCerrada(group.semanaEstado)"
                         flat
                         dense
+                        color="deep-purple"
+                        icon="draw"
+                        label="Enviar firmas"
+                        size="sm"
+                        class="bit-btn"
+                        :disable="!canEnviarFirmasSemana(group)"
+                        :loading="sendingFirmasKey === clientKey(props.row.cnsbite, group.cliente)"
+                        @click.stop="openFirmasSemana(props.row, group)"
+                      >
+                        <q-tooltip v-if="!canEnviarFirmasSemana(group)">
+                          {{ firmasSemanaTooltip(group) }}
+                        </q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        v-if="!isSemanaClienteCerrada(group.semanaEstado)"
+                        flat
+                        dense
                         color="positive"
                         icon="lock"
                         label="Cerrar semana"
@@ -544,6 +561,9 @@
           </p>
           <p v-if="!cerrarSemanaOpciones.puedeCerrar" class="bit-cerrar-dialog__hint">
             {{ cerrarSemanaOpciones.motivoCerrar }}
+            <span v-if="cerrarSemanaOpciones.sinFirma > 0">
+              Use <strong>Enviar firmas</strong> para solicitar las aceptaciones pendientes.
+            </span>
           </p>
           <p v-else class="bit-cerrar-dialog__hint">
             {{ cerrarSemanaOpciones.totalSoportes }} soporte(s) listos para cerrar la semana de este cliente.
@@ -702,6 +722,7 @@ const evidenciasImagenes = ref('');
 const evidenciasLoading = ref(false);
 const evidenciasSaving = ref(false);
 const sendingReporteKey = ref('');
+const sendingFirmasKey = ref('');
 
 const cerrarSemanaOpen = ref(false);
 const cerrarSemanaRow = ref(null);
@@ -1335,6 +1356,42 @@ async function submitCerrarSemanaCliente() {
   }
 }
 
+function countSinFirmaGrupo(group) {
+  return (group?.items || []).filter((item) => isTerminado(item.estado) && !hasFirmaAceptacion(item)).length;
+}
+
+function countPendientesGrupo(group) {
+  return (group?.items || []).filter((item) => !isTerminado(item.estado)).length;
+}
+
+function canEnviarFirmasSemana(group) {
+  if (isSemanaClienteCerrada(group?.semanaEstado)) return false;
+  if (countPendientesGrupo(group) > 0) return false;
+  return countSinFirmaGrupo(group) > 0;
+}
+
+function firmasSemanaTooltip(group) {
+  if (isSemanaClienteCerrada(group?.semanaEstado)) return 'La semana ya está cerrada';
+  const pendientes = countPendientesGrupo(group);
+  if (pendientes > 0) return `${pendientes} soporte(s) aún no terminado(s)`;
+  if (countSinFirmaGrupo(group) === 0) return 'Todos los soportes ya están firmados';
+  return 'Enviar PDF y enlaces de firma al equipo';
+}
+
+function openFirmasSemana(weekRow, group) {
+  if (!weekRow?.cnsbite || !group?.cliente) return;
+  if (!canEnviarFirmasSemana(group)) {
+    $q.notify({ type: 'warning', message: firmasSemanaTooltip(group) });
+    return;
+  }
+  notifyType.value = 'bitacora_firmas_semana';
+  notifyTitle.value = 'Enviar firmas de soporte';
+  notifyCnsbite.value = weekRow.cnsbite;
+  notifyRecordId.value = weekRow.cnsbite;
+  notifyCliente.value = group.cliente;
+  notifyOpen.value = true;
+}
+
 function openReporteSemana(weekRow, group) {
   if (!weekRow?.cnsbite || !group?.cliente) return;
   if (!isSemanaClienteCerrada(group.semanaEstado)) {
@@ -1354,23 +1411,36 @@ async function onNotifySend(payload) {
   sendingNotify.value = true;
   if (notifyType.value === 'bitacora_semana') {
     sendingReporteKey.value = clientKey(notifyCnsbite.value, notifyCliente.value);
+  } else if (notifyType.value === 'bitacora_firmas_semana') {
+    sendingFirmasKey.value = clientKey(notifyCnsbite.value, notifyCliente.value);
   } else {
     sendingNotifyId.value = notifyRecordId.value;
   }
   try {
-    const data = notifyType.value === 'bitacora_semana'
-      ? await bitacoraApi.enviarReporteSemana(notifyCnsbite.value, notifyCliente.value, payload)
-      : await notificacionApi.bitacora(notifyRecordId.value, payload);
+    let data;
+    if (notifyType.value === 'bitacora_semana') {
+      data = await bitacoraApi.enviarReporteSemana(notifyCnsbite.value, notifyCliente.value, payload);
+    } else if (notifyType.value === 'bitacora_firmas_semana') {
+      data = await bitacoraApi.enviarFirmasSemana(notifyCnsbite.value, notifyCliente.value, payload);
+    } else {
+      data = await notificacionApi.bitacora(notifyRecordId.value, payload);
+    }
     notifyOpen.value = false;
     if (data.sent > 0) {
       const pdfNote = data.pdfAttached ? ' con PDF adjunto' : '';
+      const pdfCountNote = data.pdfCount > 1 ? ` (${data.pdfCount} PDF)` : pdfNote;
       $q.notify({
         type: 'positive',
         icon: 'mail',
         message: notifyType.value === 'bitacora_semana'
           ? `Reporte enviado al equipo${pdfNote}`
-          : `${data.sent} correo(s) enviado(s)`,
+          : notifyType.value === 'bitacora_firmas_semana'
+            ? `Correo de firmas enviado al equipo${pdfCountNote}`
+            : `${data.sent} correo(s) enviado(s)`,
       });
+      if (notifyType.value === 'bitacora_firmas_semana' && notifyCnsbite.value) {
+        await loadWeekBita(notifyCnsbite.value);
+      }
     } else {
       $q.notify({ type: 'warning', message: data.error || 'No se envió ningún correo' });
     }
@@ -1383,6 +1453,7 @@ async function onNotifySend(payload) {
     sendingNotify.value = false;
     sendingNotifyId.value = '';
     sendingReporteKey.value = '';
+    sendingFirmasKey.value = '';
   }
 }
 

@@ -58,6 +58,20 @@ function renderDetailRows(rows) {
     .join('');
 }
 
+function renderLinkRows(rows) {
+  return rows
+    .map(
+      ({ label, href }) => `
+        <tr>
+          <td style="padding:10px 14px;border-bottom:1px solid #eef2f7;font-size:12px;font-weight:600;color:#64748b;width:38%;vertical-align:top;">${escapeHtml(label)}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #eef2f7;font-size:14px;color:#0f172a;vertical-align:top;">
+            <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="color:#1565c0;word-break:break-all;">Firmar soportes</a>
+          </td>
+        </tr>`,
+    )
+    .join('');
+}
+
 function renderCallout({ title, text, accent }) {
   if (!text) return '';
   return `
@@ -140,6 +154,7 @@ export function buildNotificationEmailHtml({
   greeting = '',
   introText = '',
   rows = [],
+  linkRows = [],
   calloutTitle = '',
   calloutText = '',
   actionButton = null,
@@ -187,9 +202,10 @@ export function buildNotificationEmailHtml({
               ${greetingHtml}
               ${introHtml}
               ${
-                rows.length
+                rows.length || linkRows.length
                   ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:8px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#f8fafc;">
                 ${renderDetailRows(rows)}
+                ${renderLinkRows(linkRows)}
               </table>`
                   : ''
               }

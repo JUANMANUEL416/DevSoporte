@@ -31,6 +31,42 @@ export function useResource(resource) {
   };
 }
 
+export const vipCuentasCobroApi = {
+  pdf: (id) =>
+    api.get(`/vip_cuentas_cobro/${encodeURIComponent(id)}/pdf`, { responseType: 'blob' }),
+  previewNotificacion: (id) =>
+    api.get(`/vip_cuentas_cobro/${encodeURIComponent(id)}/preview-notificacion`).then((r) => r.data),
+  enviarNotificacion: (id, payload, files = []) => {
+    const fd = new FormData();
+    fd.append('payload', JSON.stringify(payload));
+    for (const file of files) {
+      fd.append('adjuntos', file);
+    }
+    return api
+      .post(`/vip_cuentas_cobro/${encodeURIComponent(id)}/enviar-notificacion`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
+  siguienteNumero: (params) =>
+    api.get('/vip_cuentas_cobro/siguiente-numero', { params }).then((r) => r.data),
+  previewHtml: (id) =>
+    api.get(`/vip_cuentas_cobro/${encodeURIComponent(id)}/preview-html`).then((r) => r.data),
+};
+
+export const vipClientesApi = {
+  plantillaVariables: () =>
+    api.get('/vip_clientes/plantilla-variables').then((r) => r.data),
+  destinatarios: (codigo) =>
+    api.get(`/vip_clientes/${encodeURIComponent(codigo)}/destinatarios-notificacion`).then((r) => r.data),
+  previewPlantilla: (codigo, payload = {}) =>
+    api.post(`/vip_clientes/${encodeURIComponent(codigo)}/preview-plantilla`, payload).then((r) => r.data),
+  previewPlantillaPdf: (codigo, payload = {}) =>
+    api.post(`/vip_clientes/${encodeURIComponent(codigo)}/preview-plantilla-pdf`, payload, {
+      responseType: 'blob',
+    }),
+};
+
 export const authApi = {
   login: (usuario, clave) => api.post('/auth/login', { usuario, clave }).then((r) => r.data),
   me: () => api.get('/auth/me').then((r) => r.data),
@@ -40,6 +76,8 @@ export const authApi = {
     api.get(`/auth/recuperar-clave/${encodeURIComponent(token)}`).then((r) => r.data),
   restablecerClave: (token, clave, clave2) =>
     api.post(`/auth/recuperar-clave/${encodeURIComponent(token)}`, { clave, clave2 }).then((r) => r.data),
+  validarAdmin: (clave) =>
+    api.post('/auth/admin-acceso', { clave }).then((r) => r.data),
 };
 
 export const appApi = {
@@ -86,6 +124,14 @@ export const bitacoraApi = {
   enviarReporteSemana: (cnsbite, cliente, payload) =>
     api
       .post(`/bitacora/semana/${encodeURIComponent(cnsbite)}/cliente/${encodeURIComponent(cliente)}/enviar-reporte`, payload)
+      .then((r) => r.data),
+  previewFirmasSemana: (cnsbite, cliente) =>
+    api
+      .get(`/bitacora/semana/${encodeURIComponent(cnsbite)}/cliente/${encodeURIComponent(cliente)}/preview-firmas`)
+      .then((r) => r.data),
+  enviarFirmasSemana: (cnsbite, cliente, payload) =>
+    api
+      .post(`/bitacora/semana/${encodeURIComponent(cnsbite)}/cliente/${encodeURIComponent(cliente)}/enviar-firmas`, payload)
       .then((r) => r.data),
   semanaPdf: (cnsbite, cliente) =>
     api.get(`/bitacora/semana-pdf/${encodeURIComponent(cnsbite)}/${encodeURIComponent(cliente)}`, {

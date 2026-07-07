@@ -121,6 +121,7 @@ export const modules = [
     resource: 'companias',
     title: 'Compañías',
     hidden: true,
+    admin: true,
     idField: 'compania',
     columns: [
       { name: 'compania', label: 'Compañía', field: 'compania', align: 'left', sortable: true },
@@ -162,6 +163,7 @@ export const modules = [
     resource: 'variables',
     title: 'Variables del Sistema',
     hidden: true,
+    admin: true,
     idField: 'idvariable',
     columns: [
       { name: 'idvariable', label: 'Variable', field: 'idvariable', align: 'left', sortable: true },
@@ -183,6 +185,7 @@ export const modules = [
     resource: 'tablagenerica',
     title: 'Tabla Genérica',
     hidden: true,
+    admin: true,
     idField: ['tabla', 'campo', 'codigo'],
     columns: [
       { name: 'tabla', label: 'Tabla', field: 'tabla', align: 'left', sortable: true },
@@ -207,6 +210,7 @@ export const modules = [
     resource: 'control_versiones',
     title: 'Control de Versiones',
     page: 'ControlVersionesPage',
+    admin: true,
     formCols: 2,
     idField: 'consecutivo',
     columns: [
@@ -990,6 +994,7 @@ export const modules = [
     resource: 'usuarios',
     title: 'Usuarios',
     hidden: true,
+    admin: true,
     idField: 'usuario',
     columns: [
       { name: 'usuario', label: 'Usuario', field: 'usuario', align: 'left', sortable: true },
@@ -1013,7 +1018,7 @@ function fmtDate(v) {
 
 // Módulos visibles en menú e inicio. Los ocultos siguen accesibles por URL directa si se necesitan.
 export function visibleModules() {
-  return modules.filter((m) => !m.hidden);
+  return modules.filter((m) => !m.hidden && !m.admin);
 }
 
 // Agrupa los módulos visibles por su propiedad "group" para construir el menú.

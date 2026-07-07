@@ -19,6 +19,24 @@ const routes = [
     meta: { public: true },
   },
   {
+    path: '/admin',
+    component: () => import('layouts/AdminLayout.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+    children: [
+      { path: '', component: () => import('pages/admin/AdminHomePage.vue') },
+      {
+        path: 'clientes-vip',
+        component: () => import('pages/admin/AdminEntityPage.vue'),
+        props: { resource: 'vip_clientes' },
+      },
+      {
+        path: 'cuentas-cobro',
+        component: () => import('pages/admin/AdminEntityPage.vue'),
+        props: { resource: 'vip_cuentas_cobro' },
+      },
+    ],
+  },
+  {
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     meta: { requiresAuth: true },
