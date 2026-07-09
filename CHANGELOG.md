@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.6] - 2026-07-09
+
+### Agregado
+- **Actas de reunión** con el cliente (formato IXIMS-REG-026): PDF, compromisos, asistentes y flujo de firmas.
+- **Finalizar reunión**, envío de enlaces de firma por correo y validación de documento en firma pública.
+- Estado **Terminada** automático al completar firmas; envío del acta firmada al equipo del cliente.
+- **Capacitaciones**: asistentes técnicos de soporte (documento) y vínculo de soportes de bitácora al acta.
+
+### Cambiado
+- UI de actas: formulario fullscreen, botones de acción en una fila alineados a la izquierda.
+
 ## [1.2.5] - 2026-07-06
 
 ### Agregado
