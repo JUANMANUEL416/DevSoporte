@@ -459,6 +459,39 @@ export const modules = [
   },
   {
     group: 'Soporte',
+    icon: 'groups',
+    resource: 'actas_reunion',
+    title: 'Actas de Reunión',
+    page: 'ActaReunionPage',
+    formCols: 2,
+    idField: 'consecutivo',
+    columns: [
+      { name: 'consecutivo', label: 'Consecutivo', field: 'consecutivo', align: 'left', sortable: true },
+      { name: 'fecha', label: 'Fecha reunión', field: 'fecha', align: 'left', format: (v) => fmtDate(v) },
+      { name: 'nombrecliente', label: 'Cliente', field: 'nombrecliente', align: 'left' },
+      { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
+    ],
+    fields: [
+      { name: 'consecutivo', label: 'Consecutivo', type: 'text', hideOnCreate: true, fixed: true },
+      { name: 'estado', label: 'Estado', type: 'text', fixed: true, hideOnCreate: true },
+      { name: 'fecha', label: 'Fecha de reunión', type: 'date', defaultToday: true, required: true },
+      {
+        name: 'cliente',
+        label: 'Cliente',
+        type: 'lookup',
+        lookupResource: 'clientes',
+        lookupValue: 'codigo',
+        lookupLabel: 'nombrecliente',
+        required: true,
+      },
+      { name: 'codificacion', label: 'Codificación', type: 'text', default: 'IXIMS-REG-026' },
+      { name: 'vigencia', label: 'Vigencia', type: 'date', default: '2012-11-29' },
+      { name: 'version', label: 'Versión', type: 'text', default: '1' },
+      { name: 'desarrollo', label: 'Motivo / desarrollo de la reunión', type: 'textarea', colSpan: 2 },
+    ],
+  },
+  {
+    group: 'Soporte',
     icon: 'support_agent',
     resource: 'bitacora',
     title: 'Bitácora',
@@ -846,7 +879,7 @@ export const modules = [
         { name: 'item', label: 'Item', type: 'number', hideOnCreate: true },
         {
           name: 'documento',
-          label: 'Funcionario',
+          label: 'Funcionario del cliente',
           type: 'lookup',
           lookupResource: 'funcionarios',
           lookupValue: 'documento',
@@ -855,6 +888,7 @@ export const modules = [
           lookupContextKeys: { codigo: 'cliente', excludeCnscapacita: 'cnscapacita' },
           fillFrom: { nombres: 'nombre', cargo: 'cargo' },
           required: true,
+          hint: 'Para técnicos del equipo de soporte use el botón «Agregar técnicos soporte».',
         },
         { name: 'nombres', label: 'Nombres', type: 'text', fixed: true },
         { name: 'cargo', label: 'Cargo', type: 'text', fixed: true },
@@ -917,6 +951,7 @@ export const modules = [
     columns: [
       { name: 'codigo', label: 'Código', field: 'codigo', align: 'left', sortable: true },
       { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'left' },
+      { name: 'documento', label: 'Documento', field: 'documento', align: 'left' },
       { name: 'usuario', label: 'Usuario acceso', field: 'usuario', align: 'left' },
       { name: 'email', label: 'Correo', field: 'email', align: 'left' },
       { name: 'estado', label: 'Estado', field: 'estado', align: 'left', format: fmtEstadoAI },
@@ -931,6 +966,12 @@ export const modules = [
     fields: [
       { name: 'codigo', label: 'Código', type: 'text', hideOnCreate: true, fixed: true },
       { name: 'nombre', label: 'Nombre', type: 'text', required: true },
+      {
+        name: 'documento',
+        label: 'Número de documento',
+        type: 'text',
+        hint: 'Cédula o documento de identidad. Facilita agregarlo como participante en capacitaciones.',
+      },
       {
         name: 'usuario',
         label: 'Usuario de acceso',

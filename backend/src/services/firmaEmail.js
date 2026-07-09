@@ -7,15 +7,24 @@ async function loadAsistenteContext(cnscapacita, item) {
     `SELECT d.cnscapacita, d.item, d.documento, d.nombres, d.cargo, d.firma, d.firma_fecha,
             r.tema, r.fecha, r.capacitador, r.cliente,
             c.nombrecliente,
-            f.email AS funcionario_email
+            f.email AS funcionario_email,
+            s.email AS soporte_email
      FROM rasistd d
      JOIN rasist r ON r.cnscapacita = d.cnscapacita
      LEFT JOIN clie c ON c.codigo = r.cliente
      LEFT JOIN clief f ON f.codigo = r.cliente AND f.documento = d.documento
+     LEFT JOIN soport s ON (
+       (d.documento LIKE 'SOP#%' AND s.codigo = SUBSTRING(d.documento FROM 5))
+       OR (s.documento IS NOT NULL AND TRIM(s.documento) <> '' AND s.documento = d.documento)
+     )
      WHERE d.cnscapacita = $1 AND d.item = $2`,
     [cnscapacita, item],
   );
-  return res.rows[0] || null;
+  const row = res.rows[0] || null;
+  if (row) {
+    row.funcionario_email = row.funcionario_email || row.soporte_email || null;
+  }
+  return row;
 }
 
 function fmtFecha(d) {
@@ -28,7 +37,9 @@ function fmtFecha(d) {
 export function emailSkipReasonMessage(reason) {
   switch (reason) {
     case 'sin_email':
-      return 'El funcionario no tiene email en Clientes → Funcionarios';
+      return 'El participante no tiene correo (funcionario del cliente o técnico de soporte)';
+    case 'sin_documento':
+      return 'El asistente no tiene número de documento registrado';
     case 'smtp_no_configurado':
       return 'Correo no configurado (revise SMTP_HOST y SMTP_USER en .env)';
     case 'no_encontrado':

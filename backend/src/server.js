@@ -18,6 +18,11 @@ import {
   isProduction,
 } from './config/env.js';
 import { sendFirmaLinkEmail } from './services/firmaEmail.js';
+import {
+  isSoporteAsistenteDocumento,
+  soporteCodigoFromDocumento,
+  applySoporteAsistenteFromDocumento,
+} from './services/capacitacionAsistente.js';
 import { applyClienteNotificaciones } from './services/clienteNotificaciones.js';
 import {
   enviarNotificacionBitacora,
@@ -69,7 +74,27 @@ import {
   actproyPreviewInformeHandler,
   actproyEnviarInformeHandler,
 } from './routes/actproy.js';
+import {
+  actreunPdfHandler,
+  actreunFirmaEstadoHandler,
+  actreunFinalizarHandler,
+  actreunEnviarFirmasHandler,
+  actreunEnviarFirmaAsistenteHandler,
+  actreunPreviewActaHandler,
+  actreunEnviarActaHandler,
+  actreunFirmaLinkHandler,
+} from './routes/actreun.js';
 import { beforeActproyCreate, beforeActproyUpdate } from './services/actproyHooks.js';
+import {
+  beforeActreunCreate,
+  beforeActreunUpdate,
+  beforeActreunCompromisoCreate,
+  beforeActreunCompromisoUpdate,
+  beforeActreunCompromisoDelete,
+  beforeActreunAsistenteCreate,
+  beforeActreunAsistenteUpdate,
+  beforeActreunAsistenteDelete,
+} from './services/actreunHooks.js';
 import { beforeSoportCreate, beforeSoportUpdate } from './services/soportHooks.js';
 import { beforeDevcambCreate, beforeDevcambUpdate } from './services/devcambHooks.js';
 import { beforeAgconCreate, beforeAgconUpdate } from './services/agendaContactoHooks.js';
@@ -102,12 +127,36 @@ async function ensureCapacitacionAbierta(cnscapacita) {
 async function validateAsistenteCreate(body) {
   if (!body.cnscapacita || !body.documento) return;
   await ensureCapacitacionAbierta(body.cnscapacita);
+  const documento = String(body.documento).trim();
+
+  if (isSoporteAsistenteDocumento(documento)) {
+    const codigo = soporteCodigoFromDocumento(documento);
+    const sop = await query(
+      `SELECT codigo, nombre, estado FROM soport WHERE codigo = $1`,
+      [codigo],
+    );
+    if (!sop.rows.length) {
+      const err = new Error('Técnico de soporte no encontrado');
+      err.status = 400;
+      throw err;
+    }
+    if (String(sop.rows[0].estado || '').toUpperCase() !== 'A') {
+      const err = new Error('El técnico de soporte no está activo');
+      err.status = 400;
+      throw err;
+    }
+    if (!body.nombres) body.nombres = sop.rows[0].nombre;
+    if (!body.cargo) body.cargo = 'Técnico de soporte';
+  } else {
+    await applySoporteAsistenteFromDocumento(body, documento);
+  }
+
   const dup = await query(
     'SELECT 1 FROM rasistd WHERE cnscapacita = $1 AND documento = $2',
-    [body.cnscapacita, body.documento],
+    [body.cnscapacita, documento],
   );
   if (dup.rows.length) {
-    const err = new Error('Este funcionario ya está registrado como asistente en esta capacitación');
+    const err = new Error('Este participante ya está registrado en esta capacitación');
     err.status = 409;
     throw err;
   }
@@ -170,6 +219,20 @@ const entityHooks = {
   actividades_proyecto: {
     beforeCreate: beforeActproyCreate,
     beforeUpdate: beforeActproyUpdate,
+  },
+  actas_reunion: {
+    beforeCreate: beforeActreunCreate,
+    beforeUpdate: beforeActreunUpdate,
+  },
+  actas_reunion_compromisos: {
+    beforeCreate: beforeActreunCompromisoCreate,
+    beforeUpdate: beforeActreunCompromisoUpdate,
+    beforeDelete: beforeActreunCompromisoDelete,
+  },
+  actas_reunion_asistentes: {
+    beforeCreate: beforeActreunAsistenteCreate,
+    beforeUpdate: beforeActreunAsistenteUpdate,
+    beforeDelete: beforeActreunAsistenteDelete,
   },
   soportes: {
     beforeCreate: beforeSoportCreate,
@@ -327,6 +390,15 @@ app.get('/api/actividades_proyecto/:id/firma-estado', requireAuth, actproyFirmaE
 app.post('/api/actividades_proyecto/:id/enviar-firma', requireAuth, actproyEnviarFirmaHandler);
 app.get('/api/actividades_proyecto/:id/preview-informe', requireAuth, actproyPreviewInformeHandler);
 app.post('/api/actividades_proyecto/:id/enviar-informe', requireAuth, actproyEnviarInformeHandler);
+
+app.get('/api/actas_reunion/:id/pdf', requireAuth, actreunPdfHandler);
+app.get('/api/actas_reunion/:id/firma-estado', requireAuth, actreunFirmaEstadoHandler);
+app.post('/api/actas_reunion/:id/finalizar', requireAuth, actreunFinalizarHandler);
+app.post('/api/actas_reunion/:id/enviar-firmas', requireAuth, actreunEnviarFirmasHandler);
+app.get('/api/actas_reunion/:id/preview-acta', requireAuth, actreunPreviewActaHandler);
+app.post('/api/actas_reunion/:id/enviar-acta', requireAuth, actreunEnviarActaHandler);
+app.get('/api/actas_reunion_asistentes/:id/firma-link', requireAuth, actreunFirmaLinkHandler);
+app.post('/api/actas_reunion_asistentes/:id/enviar-firma', requireAuth, actreunEnviarFirmaAsistenteHandler);
 
 // Monta un CRUD REST por cada entidad migrada del diccionario Clarion.
 for (const [key, entity] of Object.entries(entities)) {

@@ -64,6 +64,12 @@
               <div class="text-subtitle2">{{ info.cliente }}</div>
               <div class="text-caption text-grey">Informe {{ info.consecutivo }}</div>
             </template>
+            <template v-else-if="isActreun">
+              <div class="text-subtitle2">{{ info.nombre || 'Participante' }}</div>
+              <div class="text-caption text-grey">
+                {{ info.cargo || 'Asistente' }} · Acta {{ info.consecutivo }}
+              </div>
+            </template>
           </q-card-section>
 
           <q-separator />
@@ -109,6 +115,14 @@
                   <h4>Observaciones</h4>
                   <p>{{ info.observaciones || '—' }}</p>
                 </article>
+              </div>
+            </div>
+            <div v-else-if="isActreun" class="firma-publica__bitacora">
+              <div class="text-body2 q-mb-sm">
+                <div><strong>Cliente:</strong> {{ info.cliente }}</div>
+                <div><strong>Fecha reunión:</strong> {{ fmtFecha(info.fecha) }}</div>
+                <div><strong>Participante:</strong> {{ info.nombre || '—' }}</div>
+                <div v-if="info.cargo"><strong>Cargo:</strong> {{ info.cargo }}</div>
               </div>
             </div>
             <div v-else-if="isActproy" class="firma-publica__bitacora">
@@ -183,20 +197,27 @@
             <q-banner v-else-if="isBitacoraGrupo && !info.puedeFirmar" dense rounded class="bg-orange-1 text-orange-10 q-mb-md">
               {{ info.bloqueoMotivo || 'No hay soportes pendientes de firma.' }}
             </q-banner>
-            <q-banner v-else-if="isBitacoraAny && bitacoraDocRechazado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
+            <q-banner v-else-if="isActreun && !info.puedeFirmar" dense rounded class="bg-orange-1 text-orange-10 q-mb-md">
+              {{ info.bloqueoMotivo || 'No se puede firmar este acta.' }}
+            </q-banner>
+            <q-banner v-else-if="requiereValidacionDocumento && bitacoraDocRechazado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
               {{ bitacoraDocMensaje }}
+            </q-banner>
+            <q-banner v-else-if="info.firmado && isActreun" dense rounded class="bg-orange-1 text-orange-10 q-mb-md">
+              Este acta ya fue firmada por usted y no admite cambios.
             </q-banner>
             <q-banner v-else-if="info.firmado" dense rounded class="bg-blue-1 text-blue-10 q-mb-md">
               Ya existe una firma registrada. Puede actualizarla dibujando de nuevo o subiendo otra imagen.
             </q-banner>
 
             <div
-              v-if="isBitacoraAny && info.puedeFirmar && !(isBitacora && info.firmado) && !bitacoraDocValidado"
+              v-if="requiereValidacionDocumento && info.puedeFirmar && !(isBitacora && info.firmado) && !(isActreun && info.firmado) && !bitacoraDocValidado"
               class="q-mb-md"
             >
               <p class="text-body2 q-mb-sm">
-                Ingrese su número de documento para continuar. Solo el funcionario
-                <strong>{{ info.funcionario || '—' }}</strong> podrá firmar.
+                Ingrese su número de documento para continuar. Solo
+                <strong>{{ isActreun ? (info.nombre || 'el participante registrado') : (info.funcionario || '—') }}</strong>
+                podrá firmar.
               </p>
               <div class="row q-col-gutter-sm items-start">
                 <div class="col-grow">
@@ -262,7 +283,17 @@
             />
           </q-card-section>
 
-          <q-card-section v-else-if="!isBitacoraAny && !isBitacoraBlocked" class="q-pt-none">
+          <q-card-section v-else-if="mostrarFirmaActreun" class="q-pt-none">
+            <SignaturePad
+              :titulo="signatureTitle"
+              height="200px"
+              :show-cancel="false"
+              :allow-upload="true"
+              @save="onSave"
+            />
+          </q-card-section>
+
+          <q-card-section v-else-if="!requiereValidacionDocumento && !isBitacoraBlocked" class="q-pt-none">
             <SignaturePad
               :titulo="signatureTitle"
               height="200px"
@@ -311,6 +342,8 @@ const isBitacora = computed(() => info.value?.mode === 'bitacora');
 const isBitacoraGrupo = computed(() => info.value?.mode === 'bitacora_grupo');
 const isBitacoraAny = computed(() => isBitacora.value || isBitacoraGrupo.value);
 const isActproy = computed(() => info.value?.mode === 'actproy');
+const isActreun = computed(() => info.value?.mode === 'actreun');
+const requiereValidacionDocumento = computed(() => isBitacoraAny.value || isActreun.value);
 const isCapacitacionFirma = computed(() => info.value?.mode === 'firma' || isInvite.value);
 const isBitacoraBlocked = computed(() =>
   (isBitacora.value || isBitacoraGrupo.value) && info.value?.puedeFirmar === false,
@@ -341,17 +374,24 @@ const mostrarFirmaBitacoraGrupo = computed(() =>
   && soportesPendientes.value.length > 0
   && (grupoFirmaModo.value === 'todos' || grupoCnssoporteSeleccionado.value),
 );
+const mostrarFirmaActreun = computed(() =>
+  isActreun.value
+  && info.value?.puedeFirmar
+  && !info.value?.firmado
+  && bitacoraDocValidado.value,
+);
 
 const pageTitle = computed(() => {
   if (isBitacoraGrupo.value) return 'Firmas de aceptación de soporte';
   if (isBitacora.value) return 'Firma aceptación de la solución';
+  if (isActreun.value) return 'Firma del acta de reunión';
   if (isActproy.value) return 'Firma de aceptación del informe';
   if (isInvite.value) return 'Registro y firma de asistencia';
   return 'Firma de asistencia';
 });
 
 const signatureTitle = computed(() => (
-  isBitacoraAny.value || isActproy.value
+  isBitacoraAny.value || isActproy.value || isActreun.value
     ? 'Diligencie su firma o suba una imagen (PNG/JPG)'
     : 'Diligencie su firma en el recuadro'
 ));
@@ -359,6 +399,7 @@ const signatureTitle = computed(() => (
 const doneMessage = computed(() => {
   if (isBitacoraGrupo.value) return 'Las firmas de aceptación fueron registradas correctamente.';
   if (isBitacora.value) return 'Su firma de aceptación fue registrada correctamente.';
+  if (isActreun.value) return 'Su firma del acta de reunión fue registrada correctamente.';
   if (isActproy.value) return 'Su firma del informe fue registrada correctamente.';
   if (isInvite.value) return 'Sus datos y firma fueron registrados.';
   return 'Su firma fue registrada correctamente.';
@@ -402,6 +443,11 @@ async function loadInfo() {
     if (data.mode === 'bitacora_grupo' && data.puedeFirmar === false) {
       blocked.value = true;
       blockedMessage.value = data.bloqueoMotivo || 'No hay soportes pendientes de firma.';
+      return;
+    }
+    if (data.mode === 'actreun' && data.puedeFirmar === false) {
+      blocked.value = true;
+      blockedMessage.value = data.bloqueoMotivo || 'No se puede firmar.';
       return;
     }
     if (data.mode === 'invite') {
@@ -482,6 +528,8 @@ async function onSave(dataUrl) {
       if (grupoFirmaModo.value === 'uno') {
         body.cnssoporte = grupoCnssoporteSeleccionado.value;
       }
+    } else if (isActreun.value) {
+      body = { firma: dataUrl, documento: bitacoraDocumento.value.trim() };
     } else {
       body = { firma: dataUrl };
     }
@@ -499,7 +547,7 @@ async function onSave(dataUrl) {
     done.value = true;
     $q.notify({
       type: 'positive',
-      message: isBitacoraAny.value || isActproy.value ? 'Aceptación firmada' : 'Firma guardada',
+      message: isBitacoraAny.value || isActproy.value || isActreun.value ? 'Aceptación firmada' : 'Firma guardada',
     });
   } catch (err) {
     $q.notify({

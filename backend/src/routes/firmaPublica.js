@@ -15,6 +15,11 @@ import {
   saveBitacoraGrupoFirma,
 } from '../services/bitacoraGrupoFirma.js';
 import { getActproyFirmaEstado, saveActproyFirma } from '../services/actproyFirma.js';
+import {
+  getActreunFirmaEstado,
+  saveActreunFirma,
+  validarDocumentoFirmanteActreun,
+} from '../services/actreunFirma.js';
 
 function validateFirmaDataUrl(firma) {
   if (!firma || typeof firma !== 'string') return false;
@@ -138,6 +143,27 @@ publicFirmaRouter.get('/:token', async (req, res, next) => {
       });
     }
 
+    if (payload.scope === 'actreun_firma') {
+      const estado = await getActreunFirmaEstado(payload.consecutivo, payload.item);
+      if (!estado) return res.status(404).json({ error: 'Asistente no encontrado' });
+      const row = estado.row;
+      return res.json({
+        mode: 'actreun',
+        consecutivo: row.consecutivo,
+        item: row.item,
+        nombre: row.nombre || '',
+        cargo: row.cargo || '',
+        cliente: row.nombrecliente || row.cliente,
+        fecha: row.fecha,
+        estado: row.estado,
+        firmado: Boolean(row.firma && String(row.firma).trim()),
+        firma_fecha: row.firma_fecha || null,
+        puedeFirmar: estado.puedeFirmar,
+        requiereDocumento: true,
+        bloqueoMotivo: estado.bloqueoMotivo || '',
+      });
+    }
+
     if (payload.scope !== 'firma') {
       return res.status(400).json({ error: 'Enlace de firma inválido' });
     }
@@ -183,6 +209,15 @@ publicFirmaRouter.post('/:token/validar-documento', async (req, res, next) => {
 
     if (payload.scope === 'bitacora_firma_grupo') {
       const result = await validarDocumentoFirmanteGrupo(payload, documento);
+      return res.json(result);
+    }
+
+    if (payload.scope === 'actreun_firma') {
+      const result = await validarDocumentoFirmanteActreun(
+        payload.consecutivo,
+        payload.item,
+        documento,
+      );
       return res.json(result);
     }
 
@@ -274,6 +309,24 @@ publicFirmaRouter.post('/:token', async (req, res, next) => {
       return res.json({
         ok: true,
         message: 'Firma del informe registrada correctamente',
+        firma_fecha: saved.firma_fecha,
+      });
+    }
+
+    if (payload.scope === 'actreun_firma') {
+      const documento = String(req.body?.documento || '').trim();
+      if (!documento) {
+        return res.status(400).json({ error: 'Ingrese su número de documento' });
+      }
+      const saved = await saveActreunFirma(
+        payload.consecutivo,
+        payload.item,
+        firma,
+        documento,
+      );
+      return res.json({
+        ok: true,
+        message: 'Firma del acta registrada correctamente',
         firma_fecha: saved.firma_fecha,
       });
     }

@@ -98,7 +98,33 @@ export function crudRouter(entity) {
     }
 
     const excludeCap = entity.excludeCapacitaParam && req.query[entity.excludeCapacitaParam];
-    if (excludeCap) {
+    if (excludeCap && entity.excludeCapacitaSoport) {
+      params.push(excludeCap);
+      clauses.push(`(
+        codigo NOT IN (
+          SELECT SUBSTRING(documento FROM 5) FROM rasistd
+          WHERE cnscapacita = $${params.length} AND documento LIKE 'SOP#%'
+        )
+        AND (
+          documento IS NULL OR TRIM(documento) = ''
+          OR documento NOT IN (
+            SELECT documento FROM rasistd
+            WHERE cnscapacita = $${params.length}
+              AND documento IS NOT NULL AND TRIM(documento) <> ''
+          )
+        )
+      )`);
+    } else if (excludeCap && entity.excludeCapacitaDocumentPrefix) {
+      params.push(excludeCap, entity.excludeCapacitaDocumentPrefix);
+      clauses.push(
+        `codigo NOT IN (
+          SELECT SUBSTRING(documento FROM ${entity.excludeCapacitaDocumentPrefix.length + 1})
+          FROM rasistd
+          WHERE cnscapacita = $${params.length - 1}
+            AND documento LIKE $${params.length} || '%'
+        )`,
+      );
+    } else if (excludeCap) {
       params.push(excludeCap);
       clauses.push(
         `documento NOT IN (SELECT documento FROM rasistd WHERE cnscapacita = $${params.length} AND documento IS NOT NULL AND TRIM(documento) <> '')`,

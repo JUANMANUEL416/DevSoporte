@@ -9,7 +9,7 @@
           <p class="cap-hero__eyebrow">Soporte</p>
           <h1 class="cap-hero__title">Control Capacitaciones</h1>
           <p class="cap-hero__subtitle">
-            Registre actas, gestione asistentes, firmas digitales y envío de notificaciones.
+            Registre actas, gestione participantes (cliente y técnicos de soporte), firmas digitales y envío de notificaciones.
           </p>
         </div>
       </div>
@@ -198,7 +198,20 @@
                       label="Agregar asistente"
                       size="sm"
                       class="cap-btn"
+                      :disable="!props.row.cliente"
                       @click="openAsisCreate(props.row)"
+                    >
+                      <q-tooltip v-if="!props.row.cliente">Asigne un cliente a la capacitación</q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      v-if="isCapAbierta(props.row)"
+                      outline
+                      color="primary"
+                      icon="engineering"
+                      label="Agregar técnicos soporte"
+                      size="sm"
+                      class="cap-btn"
+                      @click="openSopAsisDialog(props.row)"
                     />
                   </div>
                 </header>
@@ -217,6 +230,18 @@
                   hide-pagination
                   :pagination="{ rowsPerPage: 0 }"
                 >
+                  <template #body-cell-documento="cell">
+                    <q-td :props="cell">
+                      <q-badge
+                        v-if="isSoporteParticipant(cell.row)"
+                        dense
+                        color="blue-grey-6"
+                        label="Soporte"
+                        class="q-mr-xs"
+                      />
+                      {{ displayDocumento(cell.row) }}
+                    </q-td>
+                  </template>
                   <template #body-cell-acciones="cell">
                     <q-td :props="cell">
                       <div v-if="isCapAbierta(props.row)" class="cap-actions">
@@ -234,7 +259,15 @@
                         <q-btn flat dense round icon="draw" color="secondary" @click="openFirma(cell.row)">
                           <q-tooltip>Firmar</q-tooltip>
                         </q-btn>
-                        <q-btn flat dense round icon="edit" color="primary" @click="openAsisEdit(cell.row)">
+                        <q-btn
+                          v-if="!isSoporteParticipant(cell.row)"
+                          flat
+                          dense
+                          round
+                          icon="edit"
+                          color="primary"
+                          @click="openAsisEdit(cell.row)"
+                        >
                           <q-tooltip>Editar</q-tooltip>
                         </q-btn>
                         <q-btn flat dense round icon="delete" color="negative" @click="confirmAsisDelete(cell.row)">
@@ -426,6 +459,54 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="sopAsisOpen" persistent>
+      <q-card class="cap-sop-asis-dialog">
+        <q-card-section class="cap-sop-asis-dialog__header">
+          <div>
+            <p class="cap-sop-asis-dialog__eyebrow">Participantes</p>
+            <div class="cap-sop-asis-dialog__title">Agregar técnicos de soporte</div>
+            <div v-if="sopAsisCap" class="cap-sop-asis-dialog__subtitle">{{ sopAsisCap.cnscapacita }}</div>
+          </div>
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section>
+          <p class="text-body2 text-grey-8 q-mb-md">
+            Seleccione uno o más técnicos del equipo de soporte. Se registrarán como participantes del acta
+            (con firma digital y correo si está configurado).
+          </p>
+          <p v-if="!sopAsisDisponibles.length && !loadingSopAsis" class="text-grey-7">
+            No hay técnicos de soporte activos disponibles para esta capacitación.
+          </p>
+          <q-table
+            v-else
+            class="soportes-table"
+            :rows="sopAsisDisponibles"
+            :columns="sopAsisPickColumns"
+            row-key="codigo"
+            flat
+            bordered
+            dense
+            hide-pagination
+            :pagination="{ rowsPerPage: 0 }"
+            selection="multiple"
+            v-model:selected="sopAsisSelected"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" v-close-popup />
+          <q-btn
+            unelevated
+            color="primary"
+            label="Agregar seleccionados"
+            :disable="!sopAsisSelected.length"
+            :loading="addingSopAsistentes"
+            @click="confirmAddSopAsistentes"
+          />
+        </q-card-actions>
+        <q-inner-loading :showing="loadingSopAsis" />
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -444,6 +525,9 @@ import NotifyRecipientDialog from 'components/NotifyRecipientDialog.vue';
 const $q = useQuasar();
 const capApi = useResource('capacitaciones');
 const asisApi = useResource('asistentes');
+const sopApi = useResource('soportes');
+
+const SOPORTE_ASISTENTE_PREFIX = 'SOP#';
 
 const mod = findModule('capacitaciones');
 const capModule = computed(() => mod);
@@ -478,6 +562,12 @@ const asisColumns = computed(() => [
   ...mod.detail.columns,
   { name: 'firma', label: 'Firma', field: 'firma', align: 'center' },
 ]);
+const sopAsisPickColumns = [
+  { name: 'codigo', label: 'Código', field: 'codigo', align: 'left' },
+  { name: 'documento', label: 'Documento', field: 'documento', align: 'left' },
+  { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'left' },
+  { name: 'email', label: 'Correo', field: 'email', align: 'left' },
+];
 
 const capRows = ref([]);
 const asisCache = ref({});
@@ -523,10 +613,35 @@ const estadoOpciones = ref(null);
 const loadingEstadoOpciones = ref(false);
 const changingEstado = ref(false);
 const pendingEstado = ref('');
+const sopAsisOpen = ref(false);
+const sopAsisCap = ref(null);
+const sopAsisDisponibles = ref([]);
+const sopAsisSelected = ref([]);
+const loadingSopAsis = ref(false);
+const addingSopAsistentes = ref(false);
 
 const currentAsisRows = computed(() =>
   expandedCnscapacita.value ? getAsisRows(expandedCnscapacita.value) : [],
 );
+
+function isSoporteParticipant(row) {
+  return String(row?.cargo || '').trim() === 'Técnico de soporte'
+    || String(row?.documento || '').startsWith(SOPORTE_ASISTENTE_PREFIX);
+}
+
+function displayDocumento(row) {
+  return row.documento || '—';
+}
+
+function documentoAsistenteDesdeSoporte(sop) {
+  const doc = String(sop?.documento || '').trim();
+  if (doc) return doc;
+  return soporteAsistenteDocumento(sop.codigo);
+}
+
+function soporteAsistenteDocumento(codigo) {
+  return `${SOPORTE_ASISTENTE_PREFIX}${String(codigo || '').trim()}`;
+}
 
 function dataCols(cols) {
   return cols.filter((c) => c.name !== 'acciones' && c.name !== 'expand');
@@ -551,6 +666,76 @@ function getAsisRows(cnscapacita) {
 
 function isAsisLoading(cnscapacita) {
   return !!asisLoading.value[cnscapacita];
+}
+
+async function openSopAsisDialog(cap) {
+  if (!isCapAbierta(cap)) {
+    $q.notify({ type: 'warning', message: 'La capacitación no está abierta' });
+    return;
+  }
+  sopAsisCap.value = cap;
+  sopAsisSelected.value = [];
+  sopAsisDisponibles.value = [];
+  sopAsisOpen.value = true;
+  loadingSopAsis.value = true;
+  try {
+    const res = await sopApi.list({
+      estado: 'A',
+      excludeCnscapacita: cap.cnscapacita,
+      limit: 200,
+    });
+    sopAsisDisponibles.value = res.data || [];
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudieron cargar los técnicos de soporte',
+    });
+    sopAsisOpen.value = false;
+  } finally {
+    loadingSopAsis.value = false;
+  }
+}
+
+async function confirmAddSopAsistentes() {
+  if (!sopAsisCap.value || !sopAsisSelected.value.length) return;
+  addingSopAsistentes.value = true;
+  const cnscapacita = sopAsisCap.value.cnscapacita;
+  let item = nextAsisItem(cnscapacita);
+  let added = 0;
+  try {
+    const sinDoc = sopAsisSelected.value.filter((s) => !String(s.documento || '').trim());
+    if (sinDoc.length) {
+      $q.notify({
+        type: 'warning',
+        message: `${sinDoc.length} técnico(s) sin documento; registre el número en Técnicos de Soporte para facilitar la asistencia.`,
+      });
+    }
+    for (const sop of sopAsisSelected.value) {
+      await asisApi.create({
+        cnscapacita,
+        item,
+        documento: documentoAsistenteDesdeSoporte(sop),
+        nombres: sop.nombre,
+        cargo: 'Técnico de soporte',
+      });
+      item += 1;
+      added += 1;
+    }
+    await loadAsistentes(cnscapacita, true);
+    sopAsisOpen.value = false;
+    $q.notify({
+      type: 'positive',
+      message: `${added} técnico(s) de soporte agregado(s) como participantes`,
+    });
+  } catch (err) {
+    if (added > 0) await loadAsistentes(cnscapacita, true);
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudieron agregar todos los participantes',
+    });
+  } finally {
+    addingSopAsistentes.value = false;
+  }
 }
 
 async function loadCapacitaciones() {
@@ -1280,6 +1465,56 @@ onMounted(() => {
     font-weight: 600;
     text-transform: uppercase;
     color: #00695c;
+  }
+}
+
+.cap-sop-asis-dialog {
+  min-width: 720px;
+  max-width: 95vw;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.cap-sop-asis-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+  color: #fff;
+}
+
+.cap-sop-asis-dialog__eyebrow {
+  margin: 0 0 2px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+
+.cap-sop-asis-dialog__title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.cap-sop-asis-dialog__subtitle {
+  font-size: 0.78rem;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.soportes-table {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+
+  :deep(thead tr:first-child th) {
+    background: #e3f2fd;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #1565c0;
   }
 }
 

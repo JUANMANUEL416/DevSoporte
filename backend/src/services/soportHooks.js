@@ -72,7 +72,24 @@ function normalizeEmail(body) {
   body.email = email || null;
 }
 
+async function normalizeDocumento(body, codigoActual = '') {
+  if (body.documento === undefined) return;
+  const documento = String(body.documento || '').trim();
+  body.documento = documento || null;
+  if (!documento) return;
+
+  const dup = await query(
+    `SELECT codigo FROM soport
+     WHERE documento = $1 AND ($2 = '' OR codigo <> $2)`,
+    [documento, codigoActual || ''],
+  );
+  if (dup.rows.length) {
+    throw httpError('Ese número de documento ya está registrado en otro técnico', 409);
+  }
+}
+
 export async function beforeSoportCreate(body) {
+  await normalizeDocumento(body);
   await normalizeUsuario(body);
   normalizeEmail(body);
   await hashClaveIfPresent(body);
@@ -80,6 +97,7 @@ export async function beforeSoportCreate(body) {
 }
 
 export async function beforeSoportUpdate(body, ids) {
+  await normalizeDocumento(body, ids[0]);
   await normalizeUsuario(body, ids[0]);
   normalizeEmail(body);
   await hashClaveIfPresent(body);

@@ -372,7 +372,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import { clientesApi, notificacionApi, bitacoraApi, actproyApi, vipClientesApi, vipCuentasCobroApi, useResource } from 'src/services/api';
+import { clientesApi, notificacionApi, bitacoraApi, actproyApi, actreunApi, vipClientesApi, vipCuentasCobroApi, useResource } from 'src/services/api';
 import { formatNombreConTratamiento } from 'src/utils/saludo';
 
 const emit = defineEmits(['update:modelValue', 'send']);
@@ -430,6 +430,7 @@ const isBitacoraMode = computed(() => props.notifyType === 'bitacora');
 const isSemanaReportMode = computed(() => props.notifyType === 'bitacora_semana');
 const isFirmasSemanaMode = computed(() => props.notifyType === 'bitacora_firmas_semana');
 const isActproyMode = computed(() => props.notifyType === 'actproy');
+const isActreunMode = computed(() => props.notifyType === 'actreun');
 const isVipCuentaCobroMode = computed(() => props.notifyType === 'vip_cuenta_cobro');
 const isSplitRecipientsMode = computed(() =>
   isActaMode.value
@@ -438,6 +439,7 @@ const isSplitRecipientsMode = computed(() =>
   || isSemanaReportMode.value
   || isFirmasSemanaMode.value
   || isActproyMode.value
+  || isActreunMode.value
   || isVipCuentaCobroMode.value,
 );
 const cronogramaTipo = ref('programacion');
@@ -449,7 +451,9 @@ const cronogramaTipoOptions = [
   { label: 'Programación', value: 'programacion' },
   { label: 'Seguimiento', value: 'seguimiento' },
 ];
-const isEquipoOnlyMode = computed(() => isSemanaReportMode.value || isFirmasSemanaMode.value);
+const isEquipoOnlyMode = computed(() =>
+  isSemanaReportMode.value || isFirmasSemanaMode.value || isActreunMode.value,
+);
 
 const allContactos = computed(() => [...contactos.value, ...manualContactos.value]);
 
@@ -504,6 +508,13 @@ const previewSample = computed(() => {
       .map((c) => c.email)
       .join(', ') || '(ninguno)';
     return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF informe firmado)`;
+  }
+  if (isActreunMode.value) {
+    const para = allContactosTo.value
+      .filter((c) => selectedTo.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(sin equipo con email)';
+    return `Para: ${para}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF acta de reunión firmada)`;
   }
   if (isVipCuentaCobroMode.value) {
     const para = allContactosTo.value
@@ -724,6 +735,32 @@ watch(
           $q.notify({
             type: 'warning',
             message: 'El cliente no tiene contactos con correo. Agregue uno manualmente en Para.',
+          });
+        }
+        return;
+      }
+
+      if (isActreunMode.value) {
+        const [destData, previewData] = await Promise.all([
+          clientesApi.destinatarios(props.clienteCodigo),
+          actreunApi.previewActa(props.recordId),
+        ]);
+        clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
+        defaultSubject.value = previewData.subject || '';
+        defaultBody.value = previewData.body || '';
+        subject.value = previewData.subject || '';
+        bodyText.value = previewData.body || '';
+        contactosTo.value = (destData.equipoConEmail || []).map((c, i) => ({
+          ...c,
+          id: `to-${i}-${c.email}`,
+        }));
+        contactosCc.value = [];
+        selectedTo.value = contactosTo.value.map((c) => c.email);
+        selectedCc.value = [];
+        if (!contactosTo.value.length) {
+          $q.notify({
+            type: 'warning',
+            message: 'El equipo no tiene correos registrados. Agregue uno manualmente en Para.',
           });
         }
         return;

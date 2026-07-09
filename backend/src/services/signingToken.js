@@ -62,6 +62,12 @@ export function verifySigningToken(token) {
     if (!payload.consecutivo) throw new Error('Token inválido');
     return payload;
   }
+  if (payload.scope === 'actreun_firma') {
+    if (!payload.consecutivo || payload.item == null || !payload.documento) {
+      throw new Error('Token inválido');
+    }
+    return payload;
+  }
   if (payload.scope === 'password_reset') {
     if (!payload.codigo || !payload.usuario) throw new Error('Token inválido');
     return payload;
@@ -109,6 +115,20 @@ export function createActproyFirmaToken({ consecutivo }) {
     {
       scope: 'actproy_firma',
       consecutivo: String(consecutivo),
+    },
+    SECRET,
+    { expiresIn: `${days}d` },
+  );
+}
+
+export function createActreunFirmaToken({ consecutivo, item, documento }) {
+  const days = Number(process.env.SIGNING_TOKEN_EXPIRES_DAYS) || 14;
+  return jwt.sign(
+    {
+      scope: 'actreun_firma',
+      consecutivo: String(consecutivo),
+      item: Number(item),
+      documento: String(documento),
     },
     SECRET,
     { expiresIn: `${days}d` },
