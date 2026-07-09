@@ -91,8 +91,11 @@ npm install --omit=dev
 
 Write-Step "Instalando dependencias frontend"
 Set-Location (Join-Path $Root 'frontend')
-npm install
+$prevNodeEnv = $env:NODE_ENV
+$env:NODE_ENV = 'development'
+npm install --include=dev
 npm run build
+if ($null -ne $prevNodeEnv) { $env:NODE_ENV = $prevNodeEnv } else { Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue }
 
 if (-not (Test-Path (Join-Path $Root 'frontend\dist\spa\index.html'))) {
   throw 'Build del frontend falló: no se encontró frontend/dist/spa/index.html'
