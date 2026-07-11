@@ -1,6 +1,6 @@
 {
   "name": "devsoporte",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "private": true,
   "description": "DevSoporte — migración Clarion a web (Quasar + Node + PostgreSQL)",
   "scripts": {

@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.7] - 2026-07-11
+
+### Corregido
+- **PDF de actas**: tabla de asistentes con check en IX Colombia o Cliente (formato IXIMS-REG-026), sin columnas duplicadas.
+
+### Agregado
+- **Edición de compromisos** en actas abiertas, con texto multilínea visible en la lista.
+
+### Cambiado
+- Botones de acción de compromisos y asistentes alineados a la izquierda.
+
 ## [1.2.6] - 2026-07-09
 
 ### Agregado
