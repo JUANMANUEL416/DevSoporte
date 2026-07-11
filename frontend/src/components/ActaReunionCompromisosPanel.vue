@@ -94,12 +94,88 @@
           />
         </q-td>
       </template>
+      <template #body-cell-compromiso="cell">
+        <q-td :props="cell" class="actreun-compromiso-cell">
+          <span class="actreun-compromiso-cell__text">{{ cell.row.compromiso }}</span>
+        </q-td>
+      </template>
       <template #body-cell-acciones="cell">
-        <q-td :props="cell" class="text-right">
-          <q-btn v-if="editable" flat dense round icon="delete" color="negative" @click="removeRow(cell.row)" />
+        <q-td :props="cell" class="actreun-acciones-cell">
+          <q-btn
+            v-if="editable"
+            flat
+            dense
+            round
+            icon="edit"
+            color="primary"
+            @click="openEdit(cell.row)"
+          >
+            <q-tooltip>Editar compromiso</q-tooltip>
+          </q-btn>
+          <q-btn v-if="editable" flat dense round icon="delete" color="negative" @click="removeRow(cell.row)">
+            <q-tooltip>Eliminar</q-tooltip>
+          </q-btn>
         </q-td>
       </template>
     </q-table>
+
+    <q-dialog v-model="editOpen" persistent>
+      <q-card style="min-width: 520px; max-width: 92vw">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Editar compromiso</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section>
+          <div class="row q-col-gutter-sm q-mb-sm items-center">
+            <div class="col-auto">
+              <q-checkbox v-model="editEsCliente" label="Por el cliente" dense :disable="!cliente" />
+            </div>
+            <div class="col-auto">
+              <q-badge :color="editEsCliente ? 'teal' : 'deep-orange'" :label="editEsCliente ? 'Cliente' : 'IX Colombia'" />
+            </div>
+          </div>
+          <q-input v-model="editForm.compromiso" label="Compromiso *" outlined dense type="textarea" autogrow rows="2" class="q-mb-sm" />
+          <LookupSelect
+            v-if="!editEsCliente"
+            v-model="editForm.responsable"
+            resource="soportes"
+            value-field="nombre"
+            label-field="nombre"
+            lookup-code-field="codigo"
+            label="Responsable (soporte)"
+            :extra-params="{ estado: 'A' }"
+            class="q-mb-sm"
+          />
+          <template v-else>
+            <LookupSelect
+              v-model="editForm.responsable"
+              resource="funcionarios"
+              value-field="nombre"
+              label-field="nombre"
+              lookup-code-field="documento"
+              label="Responsable (funcionario)"
+              :disable="!cliente"
+              :extra-params="funcExtraParams"
+              class="q-mb-sm"
+              @pick="onEditFuncPick"
+            />
+          </template>
+          <div class="row q-col-gutter-sm">
+            <div class="col-6">
+              <q-input v-model="editForm.fecha_inicio" label="Fecha inicio" type="date" dense outlined />
+            </div>
+            <div class="col-6">
+              <q-input v-model="editForm.fecha_entrega" label="Fecha entrega" type="date" dense outlined />
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancelar" v-close-popup />
+          <q-btn unelevated no-caps color="primary" label="Guardar" :loading="saving" @click="saveEdit" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <GenericForm
       v-model="funcFormOpen"
@@ -126,12 +202,16 @@ const props = defineProps({
   localMode: { type: Boolean, default: false },
   editable: { type: Boolean, default: true },
 });
-const emit = defineEmits(['changed', 'add', 'remove']);
+const emit = defineEmits(['changed', 'add', 'remove', 'update']);
 
 const $q = useQuasar();
 const api = useResource('actas_reunion_compromisos');
 const saving = ref(false);
 const esCliente = ref(false);
+const editOpen = ref(false);
+const editEsCliente = ref(false);
+const editingRow = ref(null);
+const editForm = ref(emptyForm());
 const funcFormOpen = ref(false);
 const funcCurrent = ref({});
 
@@ -155,12 +235,12 @@ const funcModule = computed(() => ({
 }));
 
 const columns = [
+  { name: 'acciones', label: '', field: 'acciones', align: 'left' },
   { name: 'lado', label: 'Lado', field: 'lado', align: 'left' },
   { name: 'compromiso', label: 'Compromiso', field: 'compromiso', align: 'left' },
   { name: 'responsable', label: 'Responsable', field: 'responsable', align: 'left' },
   { name: 'fecha_inicio', label: 'Inicio', field: 'fecha_inicio', align: 'left' },
   { name: 'fecha_entrega', label: 'Entrega', field: 'fecha_entrega', align: 'left' },
-  { name: 'acciones', label: '', field: 'acciones', align: 'right' },
 ];
 
 function emptyForm() {
@@ -184,6 +264,71 @@ function nextItem() {
 
 function onFuncPick(row) {
   if (row?.nombre) form.value.responsable = row.nombre;
+}
+
+function onEditFuncPick(row) {
+  if (row?.nombre) editForm.value.responsable = row.nombre;
+}
+
+function toDateInput(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return String(d).slice(0, 10);
+  return dt.toISOString().slice(0, 10);
+}
+
+function openEdit(row) {
+  editingRow.value = row;
+  editEsCliente.value = row.lado === 'cliente';
+  editForm.value = {
+    compromiso: row.compromiso || '',
+    responsable: row.responsable || '',
+    fecha_inicio: toDateInput(row.fecha_inicio) || new Date().toISOString().slice(0, 10),
+    fecha_entrega: toDateInput(row.fecha_entrega),
+  };
+  editOpen.value = true;
+}
+
+async function saveEdit() {
+  if (!editForm.value.compromiso?.trim()) {
+    $q.notify({ type: 'warning', message: 'Indique el compromiso' });
+    return;
+  }
+  if (!editForm.value.responsable?.trim()) {
+    $q.notify({ type: 'warning', message: 'Seleccione el responsable' });
+    return;
+  }
+  if (editEsCliente.value && !props.cliente) {
+    $q.notify({ type: 'warning', message: 'Seleccione el cliente del acta' });
+    return;
+  }
+
+  const payload = {
+    lado: editEsCliente.value ? 'cliente' : 'ix',
+    compromiso: editForm.value.compromiso.trim(),
+    responsable: editForm.value.responsable.trim(),
+    fecha_inicio: editForm.value.fecha_inicio || null,
+    fecha_entrega: editForm.value.fecha_entrega || null,
+  };
+
+  if (props.localMode) {
+    emit('update', { ...editingRow.value, ...payload });
+    editOpen.value = false;
+    $q.notify({ type: 'positive', message: 'Compromiso actualizado' });
+    return;
+  }
+
+  saving.value = true;
+  try {
+    await api.update(rowKey(editingRow.value), payload);
+    editOpen.value = false;
+    emit('changed');
+    $q.notify({ type: 'positive', message: 'Compromiso actualizado' });
+  } catch (err) {
+    $q.notify({ type: 'negative', message: err.response?.data?.error || 'Error al actualizar' });
+  } finally {
+    saving.value = false;
+  }
 }
 
 function openNuevoFuncionario() {
@@ -273,5 +418,25 @@ function removeRow(row) {
 .actreun-panel-btn--link {
   font-weight: 600;
   font-size: 12px;
+}
+
+.actreun-compromiso-cell {
+  white-space: normal !important;
+  word-break: break-word;
+  max-width: 360px;
+  vertical-align: top;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+.actreun-compromiso-cell__text {
+  display: block;
+  line-height: 1.45;
+  min-height: 2.9em;
+}
+
+.actreun-acciones-cell {
+  white-space: nowrap;
+  vertical-align: top;
 }
 </style>

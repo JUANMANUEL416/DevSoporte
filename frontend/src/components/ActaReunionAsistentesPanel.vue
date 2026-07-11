@@ -53,30 +53,29 @@
             />
           </template>
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-4">
           <q-input v-model="form.nombre" label="Nombre" dense outlined readonly bg-color="grey-1" />
         </div>
-        <div class="col-12 col-md-2">
+        <div class="col-12 col-md-3">
           <q-input v-model="form.documento" label="Documento" dense outlined readonly bg-color="grey-1" />
         </div>
-        <div class="col-12 col-md-2">
-          <q-btn
-            unelevated
-            no-caps
-            color="primary"
-            icon="person_add"
-            label="Agregar"
-            class="full-width actreun-panel-btn"
-            :loading="saving"
-            @click="add"
-          />
-        </div>
       </div>
-      <div class="row q-col-gutter-sm q-mb-md">
+      <div class="row q-col-gutter-sm q-mb-sm">
         <div class="col-12">
           <q-input v-model="form.cargo" label="Cargo" dense outlined />
         </div>
       </div>
+      <q-btn
+        unelevated
+        no-caps
+        color="primary"
+        icon="person_add"
+        label="Agregar asistente"
+        size="sm"
+        class="actreun-panel-btn q-mb-md"
+        :loading="saving"
+        @click="add"
+      />
     </template>
 
     <q-table
@@ -108,7 +107,7 @@
         </q-td>
       </template>
       <template #body-cell-acciones="cell">
-        <q-td :props="cell" class="text-right">
+        <q-td :props="cell" class="actreun-acciones-cell">
           <q-btn
             v-if="showFirmaActions && !cell.row.firma_fecha"
             flat
@@ -190,17 +189,18 @@ const funcModule = computed(() => ({
 }));
 
 const tableColumns = computed(() => {
-  const cols = [
+  const cols = [];
+  if (props.editable || props.showFirmaActions) {
+    cols.push({ name: 'acciones', label: '', field: 'acciones', align: 'left' });
+  }
+  cols.push(
     { name: 'lado', label: 'Lado', field: 'lado', align: 'left' },
     { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'left' },
     { name: 'documento', label: 'Documento', field: 'documento', align: 'left' },
     { name: 'cargo', label: 'Cargo', field: 'cargo', align: 'left' },
-  ];
+  );
   if (props.showFirmaActions) {
     cols.push({ name: 'firma', label: 'Firma', field: 'firma', align: 'center' });
-  }
-  if (props.editable || props.showFirmaActions) {
-    cols.push({ name: 'acciones', label: '', field: 'acciones', align: 'right' });
   }
   return cols;
 });
@@ -332,5 +332,9 @@ function removeRow(row) {
 .actreun-panel-btn--link {
   font-weight: 600;
   font-size: 12px;
+}
+.actreun-acciones-cell {
+  white-space: nowrap;
+  vertical-align: top;
 }
 </style>

@@ -119,6 +119,7 @@
                   local-mode
                   @add="onAddCompromiso"
                   @remove="onRemoveCompromiso"
+                  @update="onUpdateCompromiso"
                 />
               </q-card-section>
             </q-card>
@@ -261,6 +262,12 @@ function onAddCompromiso(row) {
 
 function onRemoveCompromiso(row) {
   localCompromisos.value = localCompromisos.value.filter((r) => r._localId !== row._localId);
+}
+
+function onUpdateCompromiso(row) {
+  localCompromisos.value = localCompromisos.value.map((r) =>
+    (r._localId && r._localId === row._localId) ? { ...r, ...row } : r,
+  );
 }
 
 function onAddAsistente(row) {

@@ -169,61 +169,69 @@ function drawCompromisosTable(doc, L, R, y, title, compromisos, minRows = 2) {
   return y + 6;
 }
 
-function drawAsistentes(doc, L, R, y, asistentesIx, asistentesCli) {
+function drawCheckMark(doc, x, y, w, h) {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const r = Math.min(w, h) * 0.16;
+  doc.save().fillColor('#000').circle(cx, cy, r).fill().restore();
+}
+
+function drawAsistentes(doc, L, R, y, asistentes) {
   const W = R - L;
   label(doc, 'ASISTENTES', L, y, W, 18, { size: 9, align: 'left' });
   y += 18;
 
-  const half = W / 2;
-  const sigW = half * 0.22;
-  const nameW = half - sigW - 52;
-  const sideW = 52;
+  const chkW = 44;
+  const sigW = 100;
+  const nameW = W - chkW * 2 - sigW;
 
-  // Encabezado izquierda (IX)
-  label(doc, 'IX COLOMBIA', L, y, sideW, 16, { size: 7 });
-  label(doc, 'NOMBRE Y CARGO', L + sideW, y, nameW, 16, { size: 7 });
-  label(doc, 'FIRMA', L + sideW + nameW, y, sigW, 16, { size: 7 });
-  // Encabezado derecha (CLIENTE)
-  const rx = L + half;
-  label(doc, 'CLIENTE', rx, y, sideW, 16, { size: 7 });
-  label(doc, 'NOMBRE Y CARGO', rx + sideW, y, nameW, 16, { size: 7 });
-  label(doc, 'FIRMA', rx + sideW + nameW, y, sigW, 16, { size: 7 });
+  const cols = [
+    { label: 'IX COLOMBIA', w: chkW },
+    { label: 'CLIENTE', w: chkW },
+    { label: 'NOMBRE Y CARGO', w: nameW },
+    { label: 'FIRMA', w: sigW },
+  ];
+
+  let x = L;
+  for (const col of cols) {
+    label(doc, col.label, x, y, col.w, 16, { size: col.label === 'NOMBRE Y CARGO' ? 7 : 6 });
+    x += col.w;
+  }
   y += 16;
 
-  const maxRows = Math.max(asistentesIx.length, asistentesCli.length, 3);
-  const rowH = 36;
+  const rows = [...asistentes];
+  const minRows = 6;
+  while (rows.length < minRows) rows.push(null);
 
-  for (let i = 0; i < maxRows; i += 1) {
-    const ix = asistentesIx[i] || null;
-    const cli = asistentesCli[i] || null;
+  const rowH = 40;
+  for (const row of rows) {
+    const ixX = L;
+    const cliX = L + chkW;
+    const nameX = L + chkW * 2;
+    const sigX = L + chkW * 2 + nameW;
 
-    box(doc, L, y, sideW, rowH);
-    box(doc, L + sideW, y, nameW, rowH);
-    box(doc, L + sideW + nameW, y, sigW, rowH);
-    box(doc, rx, y, sideW, rowH);
-    box(doc, rx + sideW, y, nameW, rowH);
-    box(doc, rx + sideW + nameW, y, sigW, rowH);
+    box(doc, ixX, y, chkW, rowH);
+    box(doc, cliX, y, chkW, rowH);
+    box(doc, nameX, y, nameW, rowH);
+    box(doc, sigX, y, sigW, rowH);
 
-    if (ix) {
+    if (row) {
+      const esCliente = row.lado === 'cliente';
+      if (esCliente) drawCheckMark(doc, cliX, y, chkW, rowH);
+      else drawCheckMark(doc, ixX, y, chkW, rowH);
+
       doc.font('Helvetica').fontSize(8).fillColor('#000');
-      const nombreCargo = [ix.nombre, ix.cargo].filter(Boolean).join('\n');
-      doc.text(nombreCargo, L + sideW + 4, y + 4, { width: nameW - 8, height: rowH - 8 });
-      const firmaBuf = firmaToBuffer(ix.firma);
+      doc.text(
+        [row.nombre, row.cargo].filter(Boolean).join('\n'),
+        nameX + 4,
+        y + 4,
+        { width: nameW - 8, height: rowH - 8 },
+      );
+
+      const firmaBuf = firmaToBuffer(row.firma);
       if (firmaBuf) {
         try {
-          doc.image(firmaBuf, L + sideW + nameW + 2, y + 2, { fit: [sigW - 4, rowH - 4] });
-        } catch { /* ignora */ }
-      }
-    }
-
-    if (cli) {
-      doc.font('Helvetica').fontSize(8).fillColor('#000');
-      const nombreCargo = [cli.nombre, cli.cargo].filter(Boolean).join('\n');
-      doc.text(nombreCargo, rx + sideW + 4, y + 4, { width: nameW - 8, height: rowH - 8 });
-      const firmaBuf = firmaToBuffer(cli.firma);
-      if (firmaBuf) {
-        try {
-          doc.image(firmaBuf, rx + sideW + nameW + 2, y + 2, { fit: [sigW - 4, rowH - 4] });
+          doc.image(firmaBuf, sigX + 2, y + 2, { fit: [sigW - 4, rowH - 4] });
         } catch { /* ignora */ }
       }
     }
@@ -340,7 +348,12 @@ export function buildActreunPdf(row) {
       y = 36;
     }
 
-    drawAsistentes(doc, L, R, y, row.asistentes_ix || [], row.asistentes_cliente || []);
+    const todosAsistentes = [
+      ...(row.asistentes_ix || []),
+      ...(row.asistentes_cliente || []),
+    ].sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0));
+
+    drawAsistentes(doc, L, R, y, todosAsistentes);
 
     doc.end();
   });
