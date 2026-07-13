@@ -56,7 +56,7 @@ async function buildActreunPdfAttachment(consecutivo) {
   }
   const pdfBuffer = await buildActreunPdf(report);
   return {
-    filename: actreunPdfFileName(report.header),
+    filename: actreunPdfFileName(report),
     content: pdfBuffer,
     contentType: 'application/pdf',
   };
