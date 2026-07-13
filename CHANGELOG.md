@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.8] - 2026-07-13
+
+### Corregido
+- **Actas de reunión**: no se puede agregar el mismo asistente dos veces; el selector oculta funcionarios y técnicos ya asignados.
+
 ## [1.2.7] - 2026-07-11
 
 ### Corregido
