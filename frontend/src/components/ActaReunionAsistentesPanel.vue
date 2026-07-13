@@ -90,6 +90,7 @@
       bordered
       dense
       hide-pagination
+      :pagination="{ rowsPerPage: 0 }"
     >
       <template #body-cell-lado="cell">
         <q-td :props="cell">
