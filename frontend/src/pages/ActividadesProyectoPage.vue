@@ -100,7 +100,7 @@
         :cliente-codigo="notifyCliente"
         :record-id="notifyRecordId"
         notify-type="actproy"
-        :title="`Enviar informe firmado — ${mod?.title || ''}`"
+        title="Enviar informe firmado — vista previa del correo"
         :sending="sendingNotify"
         @send="onNotifySend"
       />

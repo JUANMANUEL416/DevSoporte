@@ -108,6 +108,7 @@
                     <div class="notify-dialog__card-text">
                       <span class="notify-dialog__card-line">
                         <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                        <q-badge v-if="c.agenda" dense color="teal-7" label="A" class="q-mr-xs" />
                         {{ contactCardLabel(c) }}
                         <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
                       </span>
@@ -165,6 +166,7 @@
                     <div class="notify-dialog__card-text">
                       <span class="notify-dialog__card-line">
                         <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                        <q-badge v-if="c.agenda" dense color="teal-7" label="A" class="q-mr-xs" />
                         {{ contactCardLabel(c) }}
                         <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
                       </span>
@@ -207,6 +209,7 @@
                 <div class="notify-dialog__card-text">
                   <span class="notify-dialog__card-line">
                     <q-badge v-if="c.manual" dense color="grey-7" label="M" class="q-mr-xs" />
+                    <q-badge v-if="c.agenda" dense color="teal-7" label="A" class="q-mr-xs" />
                     {{ contactCardLabel(c) }}
                     <q-tooltip v-if="showEmailTooltip(c)">{{ c.email }}</q-tooltip>
                   </span>
@@ -228,7 +231,7 @@
                 @keyup.enter="addManualEmail"
               />
             </div>
-            <div v-if="isSplitRecipientsMode" class="col-auto" style="min-width: 130px">
+            <div v-if="isSplitRecipientsMode && !isEquipoOnlyMode" class="col-auto" style="min-width: 130px">
               <q-select
                 v-model="manualRol"
                 :options="manualRolOptions"
@@ -250,6 +253,18 @@
                 dense
                 class="notify-dialog__add-btn"
                 @click="addManualEmail"
+              />
+            </div>
+            <div v-if="showAgendaButton" class="col-auto">
+              <q-btn
+                outline
+                dense
+                no-caps
+                color="teal"
+                icon="contacts"
+                label="Agenda"
+                class="notify-dialog__agenda-btn"
+                @click="abrirAgendaDialog"
               />
             </div>
           </div>
@@ -379,14 +394,101 @@
         />
       </q-card-actions>
     </q-card>
+
+    <q-dialog v-model="agendaOpen">
+      <q-card class="notify-agenda">
+        <div class="notify-agenda__header">
+          <q-icon name="contacts" size="18px" />
+          <span>Agenda de contactos</span>
+          <q-space />
+          <q-btn flat dense round size="sm" icon="close" color="white" v-close-popup />
+        </div>
+
+        <q-card-section class="q-pt-sm">
+          <q-input
+            v-model="agendaFilter"
+            label="Buscar nombre, correo o empresa"
+            outlined
+            dense
+            clearable
+            debounce="200"
+          >
+            <template #prepend><q-icon name="search" /></template>
+          </q-input>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none notify-agenda__list">
+          <q-inner-loading :showing="loadingAgenda">
+            <q-spinner color="primary" size="32px" />
+          </q-inner-loading>
+
+          <div v-if="!loadingAgenda && !agendaFiltrados.length" class="text-center text-grey-6 q-pa-md">
+            No hay contactos activos en la agenda.
+          </div>
+
+          <q-list v-else bordered separator class="rounded-borders">
+            <q-item v-for="c in agendaFiltrados" :key="c.codigo" tag="label">
+              <q-item-section avatar>
+                <q-checkbox v-model="agendaSelected" :val="c.codigo" dense color="primary" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>{{ c.nombre }}</q-item-label>
+                <q-item-label caption>
+                  {{ c.email }}
+                  <span v-if="c.cargo"> · {{ c.cargo }}</span>
+                  <span v-if="c.empresa"> · {{ c.empresa }}</span>
+                </q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-badge
+                  :color="c.categoria === 'equipo' ? 'teal' : c.categoria === 'cliente' ? 'blue' : 'grey'"
+                  :label="fmtAgendaCategoria(c.categoria)"
+                />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+
+        <q-card-actions align="right" class="notify-agenda__actions">
+          <q-btn
+            v-if="!isEquipoOnlyMode"
+            flat
+            no-caps
+            label="Equipo → CC"
+            color="teal"
+            @click="agregarEquipoAgendaCc"
+          />
+          <q-btn
+            v-if="!isEquipoOnlyMode"
+            flat
+            no-caps
+            label="Agregar a CC"
+            color="primary"
+            @click="agregarAgendaSeleccion('cc')"
+          />
+          <q-btn unelevated no-caps label="Agregar a Para" color="primary" @click="agregarAgendaSeleccion('to')" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-dialog>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import { clientesApi, notificacionApi, bitacoraApi, actproyApi, actreunApi, vipClientesApi, vipCuentasCobroApi, useResource } from 'src/services/api';
+import {
+  clientesApi,
+  notificacionApi,
+  bitacoraApi,
+  actproyApi,
+  actreunApi,
+  vipClientesApi,
+  vipCuentasCobroApi,
+  agendaContactosApi,
+  useResource,
+} from 'src/services/api';
 import { formatNombreConTratamiento } from 'src/utils/saludo';
+import { fmtAgendaCategoria } from 'src/config/modules';
 
 const emit = defineEmits(['update:modelValue', 'send']);
 
@@ -427,6 +529,13 @@ const removingImagenIndex = ref(-1);
 const firmasGruposPreview = ref([]);
 const firmasOmitidosPreview = ref([]);
 const bitApi = useResource('bitacora');
+const agendaOpen = ref(false);
+const agendaFilter = ref('');
+const agendaRows = ref([]);
+const agendaSelected = ref([]);
+const loadingAgenda = ref(false);
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const manualRolOptions = [
   { label: 'Para (cliente)', value: 'to' },
@@ -470,6 +579,18 @@ const cronogramaTipoOptions = [
 const isEquipoOnlyMode = computed(() =>
   isSemanaReportMode.value || isFirmasSemanaMode.value || isActreunMode.value || isActreunFirmasMode.value,
 );
+
+/** Agenda disponible en envíos con destinatarios editables (informe, actas, bitácora, etc.). */
+const showAgendaButton = computed(() => !isActreunFirmasMode.value);
+
+const agendaFiltrados = computed(() => {
+  const term = String(agendaFilter.value || '').trim().toLowerCase();
+  if (!term) return agendaRows.value;
+  return agendaRows.value.filter((c) => {
+    const hay = `${c.nombre || ''} ${c.email || ''} ${c.empresa || ''} ${c.cargo || ''}`.toLowerCase();
+    return hay.includes(term);
+  });
+});
 
 const allContactos = computed(() => [...contactos.value, ...manualContactos.value]);
 
@@ -680,6 +801,10 @@ watch(
     removingImagenIndex.value = -1;
     firmasGruposPreview.value = [];
     firmasOmitidosPreview.value = [];
+    agendaOpen.value = false;
+    agendaFilter.value = '';
+    agendaRows.value = [];
+    agendaSelected.value = [];
     try {
       let preview;
       if (isCronogramaMode.value) {
@@ -1068,6 +1193,116 @@ async function removeImagenSoporte(index) {
   } finally {
     removingImagenIndex.value = -1;
   }
+}
+
+function agendaEntryFromRow(c) {
+  return {
+    id: `ag-${c.codigo}`,
+    codigo: c.codigo,
+    email: c.email,
+    nombre: c.nombre,
+    cargo: c.cargo || 'Agenda',
+    empresa: c.empresa,
+    categoria: c.categoria,
+    agenda: true,
+    manual: true,
+  };
+}
+
+function existsInSplitZone(email, zone) {
+  const key = String(email || '').toLowerCase();
+  if (!key) return false;
+  if (zone === 'cc') {
+    return [...contactosCc.value, ...manualContactosCc.value].some(
+      (c) => String(c.email || '').toLowerCase() === key,
+    );
+  }
+  if (isSplitRecipientsMode.value) {
+    return [...contactosTo.value, ...manualContactosTo.value].some(
+      (c) => String(c.email || '').toLowerCase() === key,
+    );
+  }
+  return allContactos.value.some((c) => String(c.email || '').toLowerCase() === key);
+}
+
+function addAgendaContacts(contacts, zone) {
+  let added = 0;
+  const targetZone = isEquipoOnlyMode.value || !isSplitRecipientsMode.value ? 'to' : zone;
+  for (const c of contacts) {
+    const email = String(c.email || '').trim();
+    if (!EMAIL_RE.test(email)) continue;
+
+    if (!isSplitRecipientsMode.value) {
+      const exists = allContactos.value.some((x) => x.email.toLowerCase() === email.toLowerCase());
+      if (exists) {
+        if (!selected.value.includes(email)) selected.value.push(email);
+        continue;
+      }
+      manualContactos.value.push(agendaEntryFromRow(c));
+      selected.value.push(email);
+      added += 1;
+      continue;
+    }
+
+    if (existsInSplitZone(email, targetZone)) {
+      const selectedList = targetZone === 'cc' ? selectedCc : selectedTo;
+      if (!selectedList.value.includes(email)) selectedList.value.push(email);
+      continue;
+    }
+    const entry = agendaEntryFromRow(c);
+    if (targetZone === 'cc') {
+      manualContactosCc.value.push(entry);
+      if (!selectedCc.value.includes(email)) selectedCc.value.push(email);
+    } else {
+      manualContactosTo.value.push(entry);
+      if (!selectedTo.value.includes(email)) selectedTo.value.push(email);
+    }
+    added += 1;
+  }
+  return added;
+}
+
+async function loadAgendaRows() {
+  loadingAgenda.value = true;
+  try {
+    agendaRows.value = await agendaContactosApi.listActivos();
+  } catch {
+    agendaRows.value = [];
+  } finally {
+    loadingAgenda.value = false;
+  }
+}
+
+async function abrirAgendaDialog() {
+  agendaSelected.value = [];
+  agendaFilter.value = '';
+  agendaOpen.value = true;
+  await loadAgendaRows();
+}
+
+function agregarAgendaSeleccion(zone) {
+  const picked = agendaRows.value.filter((c) => agendaSelected.value.includes(c.codigo));
+  if (!picked.length) {
+    $q.notify({ type: 'warning', message: 'Seleccione al menos un contacto' });
+    return;
+  }
+  const added = addAgendaContacts(picked, zone);
+  agendaOpen.value = false;
+  $q.notify({
+    type: 'positive',
+    message: `${added || picked.length} contacto(s) agregados a ${zone === 'cc' && !isEquipoOnlyMode.value ? 'CC' : 'Para'}`,
+  });
+}
+
+function agregarEquipoAgendaCc() {
+  const equipo = agendaRows.value.filter((c) => c.categoria === 'equipo');
+  if (!equipo.length) {
+    $q.notify({ type: 'warning', message: 'No hay contactos de equipo en la agenda' });
+    return;
+  }
+  const added = addAgendaContacts(equipo, 'cc');
+  agendaOpen.value = false;
+  $q.notify({ type: 'positive', message: `${added || equipo.length} contacto(s) del equipo en CC` });
 }
 
 function addManualEmail() {
@@ -1494,6 +1729,38 @@ function confirmSend() {
   padding: 8px 14px;
   border-top: 1px solid #e2e8f0;
   background: #fff;
+}
+
+.notify-dialog__agenda-btn {
+  min-height: 40px;
+}
+
+.notify-agenda {
+  min-width: min(560px, 96vw);
+  max-width: 96vw;
+}
+
+.notify-agenda__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.notify-agenda__list {
+  position: relative;
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  min-height: 120px;
+}
+
+.notify-agenda__actions {
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 @media (max-width: 768px) {
