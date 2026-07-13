@@ -14,7 +14,7 @@
     clearable
     :loading="loading"
     :disable="disable"
-    :rules="required ? [(v) => !!v || 'Requerido'] : []"
+    :rules="required ? requiredRules : emptyRules"
     @update:model-value="onPick"
     @filter="onFilter"
     @focus="onFocus"
@@ -52,6 +52,10 @@ const emit = defineEmits(['update:modelValue', 'pick']);
 const api = useResource(props.resource);
 const options = ref([]);
 const loading = ref(false);
+const requiredRules = [(v) => !!v || 'Requerido'];
+const emptyRules = [];
+let lastExtraParamsKey = '';
+let lastExcludeKey = '';
 
 function excludeSet() {
   return new Set(
@@ -119,21 +123,23 @@ function onPick(val) {
 }
 
 watch(
-  () => props.extraParams,
-  () => {
+  () => JSON.stringify(props.extraParams || {}),
+  (key) => {
+    if (key === lastExtraParamsKey) return;
+    lastExtraParamsKey = key;
     options.value = [];
     loadOptions('');
   },
-  { deep: true },
 );
 
 watch(
-  () => props.excludeValues,
-  () => {
+  () => JSON.stringify(props.excludeValues || []),
+  (key) => {
+    if (key === lastExcludeKey) return;
+    lastExcludeKey = key;
     options.value = [];
     loadOptions('');
   },
-  { deep: true },
 );
 
 watch(

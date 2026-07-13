@@ -49,7 +49,7 @@
                 :label="f.label"
                 :required="f.required"
                 :disable="isFieldDisabled(f)"
-                :extra-params="lookupParams(f)"
+                :extra-params="lookupParamsMap[f.name] || {}"
                 class="generic-form__field"
                 @pick="(row) => onLookupPick(f, row)"
               />
@@ -249,20 +249,26 @@ const visibleFields = computed(() =>
   ),
 );
 
-function lookupParams(f) {
-  const params = { ...(f.lookupExtraParams || {}) };
-  if (f.lookupContextKeys) {
-    for (const [param, ctxKey] of Object.entries(f.lookupContextKeys)) {
-      const fromContext = props.context?.[ctxKey];
-      const fromForm = form.value[ctxKey];
-      const val = fromContext !== undefined && fromContext !== '' ? fromContext : fromForm;
-      if (val !== undefined && val !== '') {
-        params[param] = val;
+/** Params estables por campo: evita recrear objetos en cada tecla (parpadeo LookupSelect). */
+const lookupParamsMap = computed(() => {
+  const map = {};
+  for (const f of props.module.fields) {
+    if (f.type !== 'lookup') continue;
+    const params = { ...(f.lookupExtraParams || {}) };
+    if (f.lookupContextKeys) {
+      for (const [param, ctxKey] of Object.entries(f.lookupContextKeys)) {
+        const fromContext = props.context?.[ctxKey];
+        const fromForm = form.value[ctxKey];
+        const val = fromContext !== undefined && fromContext !== '' ? fromContext : fromForm;
+        if (val !== undefined && val !== '') {
+          params[param] = val;
+        }
       }
     }
+    map[f.name] = params;
   }
-  return params;
-}
+  return map;
+});
 
 function onLookupPick(f, row) {
   if (!row) return;
