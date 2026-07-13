@@ -159,12 +159,14 @@ export const actreunApi = {
     api.get(`/actas_reunion/${encodeURIComponent(id)}/firma-estado`).then((r) => r.data),
   finalizar: (id) =>
     api.post(`/actas_reunion/${encodeURIComponent(id)}/finalizar`).then((r) => r.data),
-  enviarFirmas: (id) =>
-    api.post(`/actas_reunion/${encodeURIComponent(id)}/enviar-firmas`).then((r) => r.data),
+  enviarFirmas: (id, payload = {}) =>
+    api.post(`/actas_reunion/${encodeURIComponent(id)}/enviar-firmas`, payload).then((r) => r.data),
   enviarFirmaAsistente: (id) =>
     api.post(`/actas_reunion_asistentes/${encodeURIComponent(id)}/enviar-firma`).then((r) => r.data),
   firmaLink: (id) =>
     api.get(`/actas_reunion_asistentes/${encodeURIComponent(id)}/firma-link`).then((r) => r.data),
+  previewFirmas: (id) =>
+    api.get(`/actas_reunion/${encodeURIComponent(id)}/preview-firmas`).then((r) => r.data),
   previewActa: (id) =>
     api.get(`/actas_reunion/${encodeURIComponent(id)}/preview-acta`).then((r) => r.data),
   enviarActa: (id, payload = {}) =>

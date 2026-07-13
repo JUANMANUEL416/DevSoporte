@@ -8,6 +8,7 @@ import {
   sendActreunFirmasPendientes,
   sendActreunFirmaLinkEmail,
   previewActaActreun,
+  previewFirmasActreun,
   enviarActaActreun,
 } from '../services/actreunEmail.js';
 import { emailSkipReasonMessage } from '../services/firmaEmail.js';
@@ -51,10 +52,20 @@ export async function actreunFinalizarHandler(req, res, next) {
 
 export async function actreunEnviarFirmasHandler(req, res, next) {
   try {
-    const result = await sendActreunFirmasPendientes(req.params.id);
+    const result = await sendActreunFirmasPendientes(req.params.id, req.body || {});
     if (result.error && !result.sent) return res.status(400).json(result);
     res.json(result);
   } catch (err) {
+    next(err);
+  }
+}
+
+export async function actreunPreviewFirmasHandler(req, res, next) {
+  try {
+    const data = await previewFirmasActreun(req.params.id);
+    res.json(data);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     next(err);
   }
 }

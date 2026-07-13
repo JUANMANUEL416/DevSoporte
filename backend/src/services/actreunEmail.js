@@ -47,7 +47,22 @@ function resolveDestinatarios(cliente, emailList) {
   return emailList.map((email) => map.get(email.toLowerCase()) || { email, nombre: '' });
 }
 
-export async function sendActreunFirmaLinkEmail(asistente) {
+async function buildActreunPdfAttachment(consecutivo) {
+  const report = await fetchActreunReport(consecutivo);
+  if (!report) {
+    const err = new Error('Acta no encontrada para generar el PDF');
+    err.status = 404;
+    throw err;
+  }
+  const pdfBuffer = await buildActreunPdf(report);
+  return {
+    filename: actreunPdfFileName(report.header),
+    content: pdfBuffer,
+    contentType: 'application/pdf',
+  };
+}
+
+export async function sendActreunFirmaLinkEmail(asistente, options = {}) {
   const row = await loadAsistenteActreun(asistente.consecutivo, asistente.item);
   if (!row) return { sent: false, reason: 'no_encontrado' };
 
@@ -60,42 +75,33 @@ export async function sendActreunFirmaLinkEmail(asistente) {
   }
 
   const url = createActreunFirmaLink(row.consecutivo, row.item, row.documento);
-  const subject = `Firma acta de reunión — ${row.nombrecliente || row.cliente}`;
-  const text = `
-Estimado(a) ${row.nombre || 'participante'},
+  const defaults = buildFirmaDefaultContent(row);
+  const subjectTpl = String(options.subject || '').trim() || defaults.subject;
+  const bodyTpl = String(options.body || '').trim() || defaults.body;
+  const subject = applyNombreTemplate(subjectTpl, row.nombre || 'participante')
+    .replace(/\{\{url\}\}/gi, url);
+  const intro = applyNombreTemplate(bodyTpl, row.nombre || 'participante')
+    .replace(/\{\{url\}\}/gi, url);
 
-Se requiere su firma digital como asistente al acta de reunión:
-
-  Cliente:      ${row.nombrecliente || row.cliente}
-  Fecha:        ${fmtFecha(row.fecha)}
-  Consecutivo:  ${row.consecutivo}
-
-Abra el enlace, ingrese su número de documento y firme (válido por ${Number(process.env.SIGNING_TOKEN_EXPIRES_DAYS) || 14} días):
-
-${url}
-
-DevSoporte
-  `.trim();
-
+  const text = `${intro.trim()}\n\nEnlace de firma:\n${url}\n\nDevSoporte`.trim();
   const html = `
-<p>Estimado(a) <strong>${row.nombre || 'participante'}</strong>,</p>
-<p>Se requiere su firma digital como asistente al acta de reunión:</p>
-<ul>
-  <li><strong>Cliente:</strong> ${row.nombrecliente || row.cliente}</li>
-  <li><strong>Fecha:</strong> ${fmtFecha(row.fecha)}</li>
-  <li><strong>Consecutivo:</strong> ${row.consecutivo}</li>
-</ul>
-<p>Deberá ingresar su <strong>número de documento</strong> antes de firmar.</p>
+<p>${String(intro).trim().replace(/\n/g, '<br>')}</p>
 <p><a href="${url}">Haga clic aquí para firmar</a></p>
 <p style="font-size:12px;color:#666;">Si el enlace no abre, copie y pegue esta URL:<br>${url}</p>
 <p>DevSoporte</p>
   `.trim();
+
+  let attachment = options.pdfAttachment || null;
+  if (!attachment) {
+    attachment = await buildActreunPdfAttachment(row.consecutivo);
+  }
 
   const mail = await sendMail({
     to: email,
     subject,
     text,
     html,
+    attachments: [attachment],
     meta: {
       cliente: row.cliente || null,
       nombrecliente: row.nombrecliente || null,
@@ -110,34 +116,149 @@ DevSoporte
   return { sent: true, email, nombres: row.nombre };
 }
 
-export async function sendActreunFirmasPendientes(consecutivo) {
-  const pendientes = await query(
-    `SELECT consecutivo, item, nombre, documento FROM actreund
-     WHERE consecutivo = $1 AND (firma IS NULL OR TRIM(firma) = '')`,
+function buildFirmaDefaultContent(row) {
+  const nombreCliente = row?.nombrecliente || row?.cliente || '—';
+  return {
+    subject: `Firma acta de reunión — ${nombreCliente}`,
+    body: `Estimado(a) {{nombre}},
+
+Se requiere su firma digital como asistente al acta de reunión:
+
+  Cliente:      ${nombreCliente}
+  Fecha:        ${fmtFecha(row?.fecha)}
+  Consecutivo:  ${row?.consecutivo || '—'}
+
+Adjunto encontrará el PDF del acta para que revise los compromisos y acuerdos antes de firmar.
+
+Deberá ingresar su número de documento antes de firmar.
+El enlace es personal y válido por ${Number(process.env.SIGNING_TOKEN_EXPIRES_DAYS) || 14} días.`,
+  };
+}
+
+export async function listPendientesFirmaActreun(consecutivo) {
+  const res = await query(
+    `SELECT d.consecutivo, d.item, d.nombre, d.documento, d.lado, d.cargo,
+            f.email AS funcionario_email,
+            s.email AS soporte_email
+     FROM actreund d
+     JOIN actreun a ON a.consecutivo = d.consecutivo
+     LEFT JOIN clief f ON f.codigo = a.cliente AND f.documento = d.documento
+     LEFT JOIN soport s ON (
+       (d.documento LIKE 'SOP#%' AND s.codigo = SUBSTRING(d.documento FROM 5))
+       OR (s.documento IS NOT NULL AND TRIM(s.documento) <> '' AND s.documento = d.documento)
+     )
+     WHERE d.consecutivo = $1
+       AND (d.firma IS NULL OR TRIM(d.firma) = '')
+     ORDER BY d.item`,
     [consecutivo],
   );
+  return res.rows.map((r) => {
+    const email = String(r.funcionario_email || r.soporte_email || '').trim() || null;
+    const documento = String(r.documento || '').trim();
+    let motivo = '';
+    if (!documento) motivo = 'Sin documento';
+    else if (!email) motivo = 'Sin correo';
+    return {
+      consecutivo: r.consecutivo,
+      item: r.item,
+      nombre: r.nombre || '',
+      cargo: r.cargo || '',
+      documento,
+      lado: r.lado || 'ix',
+      email,
+      puedeEnviar: Boolean(documento && email),
+      motivo,
+    };
+  });
+}
+
+export async function previewFirmasActreun(consecutivo) {
+  const row = await loadActreunContext(consecutivo);
+  if (!row) {
+    const err = new Error('Acta no encontrada');
+    err.status = 404;
+    throw err;
+  }
+  if (row.estado !== ESTADOS_ACTREUN.EN_FIRMA) {
+    const err = new Error('El acta debe estar en estado «En firma» para enviar enlaces de firma');
+    err.status = 400;
+    throw err;
+  }
+
+  const pendientes = await listPendientesFirmaActreun(consecutivo);
+  const defaults = buildFirmaDefaultContent(row);
+  return {
+    consecutivo: row.consecutivo,
+    cliente: row.cliente,
+    nombrecliente: row.nombrecliente,
+    fecha: row.fecha,
+    subject: defaults.subject,
+    body: defaults.body,
+    adjuntoPdf: true,
+    pendientes,
+    enviables: pendientes.filter((p) => p.puedeEnviar),
+    omitidos: pendientes.filter((p) => !p.puedeEnviar),
+  };
+}
+
+export async function sendActreunFirmasPendientes(consecutivo, body = {}) {
+  const pendientes = await listPendientesFirmaActreun(consecutivo);
+  let candidates = pendientes.filter((p) => p.puedeEnviar);
+
+  const items = Array.isArray(body.items)
+    ? body.items.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+    : null;
+  if (items?.length) {
+    const set = new Set(items);
+    candidates = candidates.filter((p) => set.has(Number(p.item)));
+  }
+
+  const emails = collectEmailList(body);
+  if (emails.length && !items?.length) {
+    const set = new Set(emails.map((e) => e.toLowerCase()));
+    candidates = candidates.filter((p) => p.email && set.has(p.email.toLowerCase()));
+  }
+
+  let pdfAttachment = null;
+  if (candidates.length > 0) {
+    pdfAttachment = await buildActreunPdfAttachment(consecutivo);
+  }
+
+  const options = {
+    subject: body.subject,
+    body: body.body,
+    pdfAttachment,
+  };
 
   const details = [];
   let sent = 0;
-  for (const row of pendientes.rows) {
-    const result = await sendActreunFirmaLinkEmail(row);
+  for (const row of candidates) {
+    const result = await sendActreunFirmaLinkEmail(row, options);
     details.push({
       nombres: row.nombre,
+      item: row.item,
       ok: result.sent,
-      email: result.email || null,
+      email: result.email || row.email || null,
       message: result.sent ? 'Enviado' : emailSkipReasonMessage(result.reason),
       reason: result.reason || null,
     });
     if (result.sent) sent += 1;
   }
 
+  const omitidos = pendientes.filter((p) => !p.puedeEnviar);
+
   return {
-    total: pendientes.rows.length,
+    total: candidates.length,
     sent,
     details,
-    error: sent === 0 && pendientes.rows.length > 0
+    omitidos,
+    error: sent === 0 && candidates.length > 0
       ? 'No se envió ningún correo de firma'
-      : null,
+      : candidates.length === 0
+        ? (pendientes.length === 0
+          ? 'No hay firmas pendientes'
+          : 'Ningún asistente pendiente tiene correo y documento válidos')
+        : null,
   };
 }
 

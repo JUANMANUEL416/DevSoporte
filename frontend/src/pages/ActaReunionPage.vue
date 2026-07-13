@@ -171,8 +171,8 @@
         v-model="notifyOpen"
         :cliente-codigo="notifyCliente"
         :record-id="notifyRecordId"
-        notify-type="actreun"
-        title="Enviar acta al equipo del cliente"
+        :notify-type="notifyType"
+        :title="notifyTitle"
         :sending="sendingNotify"
         @send="onNotifySend"
       />
@@ -215,6 +215,8 @@ const pdfRef = ref(null);
 const notifyOpen = ref(false);
 const notifyCliente = ref('');
 const notifyRecordId = ref('');
+const notifyType = ref('actreun');
+const notifyTitle = ref('Enviar acta al equipo del cliente');
 const sendingNotify = ref(false);
 
 const tableColumns = computed(() => [
@@ -384,24 +386,16 @@ function finalizar(row) {
   });
 }
 
-async function enviarFirmas(row) {
-  $q.dialog({
-    title: 'Enviar firmas',
-    message: 'Se enviará el enlace de firma por correo a cada asistente pendiente. ¿Continuar?',
-    cancel: true,
-  }).onOk(async () => {
-    try {
-      const res = await actreunApi.enviarFirmas(row.consecutivo);
-      if (res.sent > 0) {
-        $q.notify({ type: 'positive', icon: 'mail', message: `Enlaces enviados: ${res.sent} de ${res.total}` });
-      } else {
-        $q.notify({ type: 'warning', message: res.error || 'No se envió ningún correo' });
-      }
-      await reloadDetail(row.consecutivo);
-    } catch (err) {
-      $q.notify({ type: 'negative', message: err.response?.data?.error || 'Error al enviar firmas' });
-    }
-  });
+function enviarFirmas(row) {
+  if (!row.cliente) {
+    $q.notify({ type: 'warning', message: 'El acta no tiene cliente asignado' });
+    return;
+  }
+  notifyRecordId.value = row.consecutivo;
+  notifyCliente.value = row.cliente;
+  notifyType.value = 'actreun_firmas';
+  notifyTitle.value = 'Enviar enlaces de firma a asistentes';
+  notifyOpen.value = true;
 }
 
 async function enviarFirmaAsistente(row) {
@@ -421,6 +415,8 @@ function openEnviarActa(row) {
   }
   notifyRecordId.value = row.consecutivo;
   notifyCliente.value = row.cliente;
+  notifyType.value = 'actreun';
+  notifyTitle.value = 'Enviar acta al equipo del cliente';
   notifyOpen.value = true;
 }
 
@@ -428,6 +424,23 @@ async function onNotifySend(payload) {
   if (!notifyRecordId.value) return;
   sendingNotify.value = true;
   try {
+    if (notifyType.value === 'actreun_firmas') {
+      const data = await actreunApi.enviarFirmas(notifyRecordId.value, payload);
+      notifyOpen.value = false;
+      if (data.sent > 0) {
+        $q.notify({
+          type: 'positive',
+          icon: 'mail',
+          message: `Enlaces enviados: ${data.sent} de ${data.total}`,
+        });
+      } else {
+        $q.notify({ type: 'warning', message: data.error || 'No se envió ningún correo' });
+      }
+      if (expanded.value === notifyRecordId.value) await reloadDetail(notifyRecordId.value);
+      await load();
+      return;
+    }
+
     const data = await actreunApi.enviarActa(notifyRecordId.value, payload);
     notifyOpen.value = false;
     if (data.sent > 0) {

@@ -345,6 +345,19 @@
               </div>
             </section>
 
+            <section v-if="isActreunFirmasMode && firmasOmitidosPreview.length" class="notify-dialog__section q-mb-sm">
+              <q-banner dense rounded class="bg-orange-1 text-orange-10">
+                <div class="text-weight-medium q-mb-xs">No se enviará a {{ firmasOmitidosPreview.length }} asistente(s):</div>
+                <div
+                  v-for="o in firmasOmitidosPreview"
+                  :key="`omit-${o.item}`"
+                  class="text-caption"
+                >
+                  {{ o.nombre || '—' }} — {{ o.motivo || 'Sin datos' }}
+                </div>
+              </q-banner>
+            </section>
+
             <div class="notify-dialog__preview-label">Vista previa</div>
             <pre class="notify-dialog__preview">{{ previewSample }}</pre>
           </section>
@@ -412,6 +425,7 @@ const funcionarioSolicitante = ref(null);
 const imagenesSoporte = ref([]);
 const removingImagenIndex = ref(-1);
 const firmasGruposPreview = ref([]);
+const firmasOmitidosPreview = ref([]);
 const bitApi = useResource('bitacora');
 
 const manualRolOptions = [
@@ -431,6 +445,7 @@ const isSemanaReportMode = computed(() => props.notifyType === 'bitacora_semana'
 const isFirmasSemanaMode = computed(() => props.notifyType === 'bitacora_firmas_semana');
 const isActproyMode = computed(() => props.notifyType === 'actproy');
 const isActreunMode = computed(() => props.notifyType === 'actreun');
+const isActreunFirmasMode = computed(() => props.notifyType === 'actreun_firmas');
 const isVipCuentaCobroMode = computed(() => props.notifyType === 'vip_cuenta_cobro');
 const isSplitRecipientsMode = computed(() =>
   isActaMode.value
@@ -440,6 +455,7 @@ const isSplitRecipientsMode = computed(() =>
   || isFirmasSemanaMode.value
   || isActproyMode.value
   || isActreunMode.value
+  || isActreunFirmasMode.value
   || isVipCuentaCobroMode.value,
 );
 const cronogramaTipo = ref('programacion');
@@ -452,7 +468,7 @@ const cronogramaTipoOptions = [
   { label: 'Seguimiento', value: 'seguimiento' },
 ];
 const isEquipoOnlyMode = computed(() =>
-  isSemanaReportMode.value || isFirmasSemanaMode.value || isActreunMode.value,
+  isSemanaReportMode.value || isFirmasSemanaMode.value || isActreunMode.value || isActreunFirmasMode.value,
 );
 
 const allContactos = computed(() => [...contactos.value, ...manualContactos.value]);
@@ -560,6 +576,18 @@ const previewSample = computed(() => {
       : '';
     return `Para: ${para}\n\nAsunto: ${subject.value}\n\n${body}${gruposNote}\n\n(Adjuntos: PDF por funcionario + enlaces de firma en el correo)`;
   }
+  if (isActreunFirmasMode.value) {
+    const seleccionados = allContactosTo.value.filter((c) => selectedTo.value.includes(c.email));
+    const para = seleccionados
+      .map((c) => `${c.nombre || c.email} <${c.email}>`)
+      .join('\n      ') || '(sin asistentes con correo)';
+    const omitNote = firmasOmitidosPreview.value.length
+      ? `\n\nOmitidos (${firmasOmitidosPreview.value.length}):\n${firmasOmitidosPreview.value.map((o) =>
+        `- ${o.nombre || '—'}: ${o.motivo || 'Sin datos'}`,
+      ).join('\n')}`
+      : '';
+    return `Para:\n      ${para}\n\nAsunto: ${subject.value}\n\n${body}${omitNote}\n\n(Adjunto: PDF del acta para revisar compromisos y acuerdos)\n(Cada correo incluye un enlace personal de firma; se pedirá el número de documento.)`;
+  }
   const first = allContactos.value.find((c) => selected.value.includes(c.email)) || { nombre: '' };
   const n = first.nombre || 'estimado(a)';
   return `Para: ${selected.value.join(', ') || '(ninguno)'}\n\nAsunto: ${subject.value}\n\n${body.replace(/\{\{nombre\}\}/g, n)}`;
@@ -651,6 +679,7 @@ watch(
     imagenesSoporte.value = [];
     removingImagenIndex.value = -1;
     firmasGruposPreview.value = [];
+    firmasOmitidosPreview.value = [];
     try {
       let preview;
       if (isCronogramaMode.value) {
@@ -761,6 +790,36 @@ watch(
           $q.notify({
             type: 'warning',
             message: 'El equipo no tiene correos registrados. Agregue uno manualmente en Para.',
+          });
+        }
+        return;
+      }
+
+      if (isActreunFirmasMode.value) {
+        const previewData = await actreunApi.previewFirmas(props.recordId);
+        clienteNombre.value = previewData.nombrecliente || props.clienteCodigo;
+        defaultSubject.value = previewData.subject || '';
+        defaultBody.value = previewData.body || '';
+        subject.value = previewData.subject || '';
+        bodyText.value = previewData.body || '';
+        firmasOmitidosPreview.value = Array.isArray(previewData.omitidos) ? previewData.omitidos : [];
+        contactosTo.value = (previewData.enviables || []).map((p, i) => ({
+          id: `asis-${p.item}-${i}`,
+          email: p.email,
+          nombre: p.nombre || p.email,
+          cargo: p.cargo || (p.lado === 'cliente' ? 'Cliente' : 'IX Colombia'),
+          item: p.item,
+          documento: p.documento,
+        }));
+        contactosCc.value = [];
+        selectedTo.value = contactosTo.value.map((c) => c.email);
+        selectedCc.value = [];
+        if (!contactosTo.value.length) {
+          $q.notify({
+            type: 'warning',
+            message: firmasOmitidosPreview.value.length
+              ? 'Ningún asistente pendiente tiene correo y documento válidos.'
+              : 'No hay firmas pendientes por enviar.',
           });
         }
         return;
@@ -886,6 +945,8 @@ function selectAll() {
 function contactCardLabel(c) {
   const name = String(c?.nombre || '').trim();
   const email = String(c?.email || '').trim();
+  const doc = String(c?.documento || '').trim();
+  if (name && doc) return `${name} · Doc. ${doc}`;
   if (name && name.toLowerCase() !== email.toLowerCase()) return name;
   return email;
 }
@@ -1093,6 +1154,11 @@ function confirmSend() {
     if (isVipCuentaCobroMode.value) {
       emit('send', { payload, files: adjuntosCxc.value || [] });
       return;
+    }
+    if (isActreunFirmasMode.value) {
+      payload.items = allContactosTo.value
+        .filter((c) => selectedTo.value.includes(c.email) && c.item != null)
+        .map((c) => c.item);
     }
     emit('send', payload);
     return;

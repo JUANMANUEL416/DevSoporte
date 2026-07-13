@@ -81,6 +81,7 @@ import {
   actreunEnviarFirmasHandler,
   actreunEnviarFirmaAsistenteHandler,
   actreunPreviewActaHandler,
+  actreunPreviewFirmasHandler,
   actreunEnviarActaHandler,
   actreunFirmaLinkHandler,
 } from './routes/actreun.js';
@@ -395,6 +396,7 @@ app.get('/api/actas_reunion/:id/pdf', requireAuth, actreunPdfHandler);
 app.get('/api/actas_reunion/:id/firma-estado', requireAuth, actreunFirmaEstadoHandler);
 app.post('/api/actas_reunion/:id/finalizar', requireAuth, actreunFinalizarHandler);
 app.post('/api/actas_reunion/:id/enviar-firmas', requireAuth, actreunEnviarFirmasHandler);
+app.get('/api/actas_reunion/:id/preview-firmas', requireAuth, actreunPreviewFirmasHandler);
 app.get('/api/actas_reunion/:id/preview-acta', requireAuth, actreunPreviewActaHandler);
 app.post('/api/actas_reunion/:id/enviar-acta', requireAuth, actreunEnviarActaHandler);
 app.get('/api/actas_reunion_asistentes/:id/firma-link', requireAuth, actreunFirmaLinkHandler);
