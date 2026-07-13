@@ -265,7 +265,22 @@ export async function enviarFirmaActproy(consecutivo, { emails = null, usuario =
   ];
   const to = destinatarios.map((d) => d.email).join(', ');
   const greeting = 'Estimado(a),';
-  const introText = `Le compartimos el informe de actividades realizadas en su proyecto para su revisión y firma de aceptación. Por favor abra el enlace y firme digitalmente; no necesita usuario ni contraseña.`;
+  const introText = `Le compartimos el informe de actividades realizadas en su proyecto para su revisión y firma de aceptación. Adjunto encontrará el PDF del informe para que valide su contenido antes de firmar. Por favor abra el enlace y firme digitalmente; no necesita usuario ni contraseña.`;
+
+  const fullRow = await fetchActproyReport(consecutivo);
+  if (!fullRow) {
+    const err = new Error('No se pudo generar el PDF del informe');
+    err.status = 404;
+    throw err;
+  }
+  const pdfContent = await buildActproyPdf(fullRow);
+  const pdfFilename = actproyPdfFileName(fullRow);
+  const attachments = [{
+    filename: pdfFilename,
+    content: pdfContent,
+    contentType: 'application/pdf',
+  }];
+
   const html = buildNotificationEmailHtml({
     preheader: `Informe de actividades — ${nombreCliente}`,
     title: 'Informe de actividades en proyecto',
@@ -275,8 +290,8 @@ export async function enviarFirmaActproy(consecutivo, { emails = null, usuario =
     greeting,
     introText,
     rows,
-    calloutTitle: 'Aceptación del informe',
-    calloutText: 'Confirme la conformidad del informe firmando digitalmente en el enlace.',
+    calloutTitle: 'Revise el PDF adjunto',
+    calloutText: `Adjunto: ${pdfFilename}. Valide el contenido del informe y luego firme digitalmente en el enlace.`,
     actionButton: { href: url, label: 'Firmar informe de actividades' },
     footerNote: 'Si el botón no funciona, copie y pegue el enlace en su navegador.',
   });
@@ -284,7 +299,7 @@ export async function enviarFirmaActproy(consecutivo, { emails = null, usuario =
     greeting,
     introText,
     rows,
-    calloutText: 'Abra el enlace para firmar el informe.',
+    calloutText: `Adjunto: ${pdfFilename}. Revise el PDF y abra el enlace para firmar.`,
     actionUrl: url,
     actionLabel: 'Firmar informe de actividades',
   });
@@ -295,6 +310,7 @@ export async function enviarFirmaActproy(consecutivo, { emails = null, usuario =
       subject,
       text,
       html,
+      attachments,
       meta: {
         cliente: row.cliente,
         nombrecliente: nombreCliente,
@@ -304,7 +320,14 @@ export async function enviarFirmaActproy(consecutivo, { emails = null, usuario =
         cuerpo: text,
       },
     });
-    return { sent: 1, total: destinatarios.length, emails: destinatarios.map((d) => d.email), url };
+    return {
+      sent: 1,
+      total: destinatarios.length,
+      emails: destinatarios.map((d) => d.email),
+      url,
+      pdfAttached: true,
+      pdfFilename,
+    };
   } catch (err) {
     return { sent: 0, total: destinatarios.length, error: err.message };
   }
