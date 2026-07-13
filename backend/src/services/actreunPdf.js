@@ -72,10 +72,10 @@ function box(doc, x, y, w, h, { fill = null } = {}) {
   doc.restore();
 }
 
-function label(doc, text, x, y, w, h, { size = 8, align = 'center' } = {}) {
+function label(doc, text, x, y, w, h, { size = 8, align = 'center', lineBreak = true } = {}) {
   box(doc, x, y, w, h, { fill: LABEL_FILL });
   doc.font('Helvetica-Bold').fontSize(size).fillColor('#000');
-  doc.text(text, x + 2, y + h / 2 - size / 2 - 1, { width: w - 4, align });
+  doc.text(text, x + 2, y + h / 2 - size / 2 - 1, { width: w - 4, align, lineBreak });
 }
 
 function value(doc, text, x, y, w, h, { size = 9, bold = false, align = 'left' } = {}) {
@@ -169,11 +169,19 @@ function drawCompromisosTable(doc, L, R, y, title, compromisos, minRows = 2) {
   return y + 6;
 }
 
-function drawCheckMark(doc, x, y, w, h) {
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const r = Math.min(w, h) * 0.16;
-  doc.save().fillColor('#000').circle(cx, cy, r).fill().restore();
+function drawCheckBox(doc, x, y, w, h, checked) {
+  const size = Math.min(11, Math.min(w, h) * 0.42);
+  const bx = x + (w - size) / 2;
+  const by = y + (h - size) / 2;
+  doc.save().lineWidth(1).strokeColor('#000').rect(bx, by, size, size).stroke();
+  if (checked) {
+    doc.lineWidth(1.4).strokeColor('#000');
+    doc.moveTo(bx + size * 0.18, by + size * 0.52)
+      .lineTo(bx + size * 0.42, by + size * 0.75)
+      .lineTo(bx + size * 0.82, by + size * 0.22)
+      .stroke();
+  }
+  doc.restore();
 }
 
 function drawAsistentes(doc, L, R, y, asistentes) {
@@ -181,20 +189,21 @@ function drawAsistentes(doc, L, R, y, asistentes) {
   label(doc, 'ASISTENTES', L, y, W, 18, { size: 9, align: 'left' });
   y += 18;
 
-  const chkW = 44;
-  const sigW = 100;
-  const nameW = W - chkW * 2 - sigW;
+  const ixW = 62;
+  const cliW = 48;
+  const sigW = 90;
+  const nameW = W - ixW - cliW - sigW;
 
   const cols = [
-    { label: 'IX COLOMBIA', w: chkW },
-    { label: 'CLIENTE', w: chkW },
-    { label: 'NOMBRE Y CARGO', w: nameW },
-    { label: 'FIRMA', w: sigW },
+    { label: 'IX COLOMBIA', w: ixW, size: 6.5 },
+    { label: 'CLIENTE', w: cliW, size: 7 },
+    { label: 'NOMBRE Y CARGO', w: nameW, size: 7 },
+    { label: 'FIRMA', w: sigW, size: 7 },
   ];
 
   let x = L;
   for (const col of cols) {
-    label(doc, col.label, x, y, col.w, 16, { size: col.label === 'NOMBRE Y CARGO' ? 7 : 6 });
+    label(doc, col.label, x, y, col.w, 16, { size: col.size, lineBreak: false });
     x += col.w;
   }
   y += 16;
@@ -203,37 +212,40 @@ function drawAsistentes(doc, L, R, y, asistentes) {
   const minRows = 6;
   while (rows.length < minRows) rows.push(null);
 
-  const rowH = 40;
+  const rowH = 28;
   for (const row of rows) {
     const ixX = L;
-    const cliX = L + chkW;
-    const nameX = L + chkW * 2;
-    const sigX = L + chkW * 2 + nameW;
+    const cliX = L + ixW;
+    const nameX = L + ixW + cliW;
+    const sigX = L + ixW + cliW + nameW;
 
-    box(doc, ixX, y, chkW, rowH);
-    box(doc, cliX, y, chkW, rowH);
+    box(doc, ixX, y, ixW, rowH);
+    box(doc, cliX, y, cliW, rowH);
     box(doc, nameX, y, nameW, rowH);
     box(doc, sigX, y, sigW, rowH);
 
     if (row) {
       const esCliente = row.lado === 'cliente';
-      if (esCliente) drawCheckMark(doc, cliX, y, chkW, rowH);
-      else drawCheckMark(doc, ixX, y, chkW, rowH);
+      drawCheckBox(doc, ixX, y, ixW, rowH, !esCliente);
+      drawCheckBox(doc, cliX, y, cliW, rowH, esCliente);
 
       doc.font('Helvetica').fontSize(8).fillColor('#000');
       doc.text(
         [row.nombre, row.cargo].filter(Boolean).join('\n'),
         nameX + 4,
-        y + 4,
-        { width: nameW - 8, height: rowH - 8 },
+        y + 3,
+        { width: nameW - 8, height: rowH - 4, lineGap: 0 },
       );
 
       const firmaBuf = firmaToBuffer(row.firma);
       if (firmaBuf) {
         try {
-          doc.image(firmaBuf, sigX + 2, y + 2, { fit: [sigW - 4, rowH - 4] });
+          doc.image(firmaBuf, sigX + 2, y + 1, { fit: [sigW - 4, rowH - 2] });
         } catch { /* ignora */ }
       }
+    } else {
+      drawCheckBox(doc, ixX, y, ixW, rowH, false);
+      drawCheckBox(doc, cliX, y, cliW, rowH, false);
     }
 
     y += rowH;
