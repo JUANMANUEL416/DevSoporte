@@ -135,14 +135,14 @@ function drawCompromisosTable(doc, L, R, y, title, compromisos, minRows = 2) {
   y += 18;
 
   const cols = [
-    { label: 'COMPROMISO', w: W * 0.46 },
-    { label: 'RESPONSABLE', w: W * 0.22 },
-    { label: 'FECHA INICIO', w: W * 0.16 },
-    { label: 'FECHA ENTREGA', w: W * 0.16 },
+    { label: 'COMPROMISO', w: W * 0.48, align: 'left' },
+    { label: 'RESPONSABLE', w: W * 0.30, align: 'left' },
+    { label: 'FECHA INICIO', w: W * 0.11, align: 'center' },
+    { label: 'FECHA ENTREGA', w: W * 0.11, align: 'center' },
   ];
   let x = L;
   for (const col of cols) {
-    label(doc, col.label, x, y, col.w, 18, { size: 7 });
+    label(doc, col.label, x, y, col.w, 18, { size: 6.5, lineBreak: false });
     x += col.w;
   }
   y += 18;
@@ -161,7 +161,7 @@ function drawCompromisosTable(doc, L, R, y, title, compromisos, minRows = 2) {
         ]
       : ['', '', '', ''];
     cols.forEach((col, i) => {
-      value(doc, vals[i], x, y, col.w, rowH, { size: 8 });
+      value(doc, vals[i], x, y, col.w, rowH, { size: 8, align: col.align });
       x += col.w;
     });
     y += rowH;
