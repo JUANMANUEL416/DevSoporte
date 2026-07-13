@@ -26,6 +26,8 @@
             lookup-code-field="codigo"
             label="Asistente (técnico soporte)"
             :extra-params="{ estado: 'A' }"
+            :exclude-values="documentosAsignados"
+            :exclude-fields="['documento', 'codigo', 'nombre']"
             @pick="onSoportePick"
           />
           <template v-else>
@@ -38,6 +40,8 @@
               label="Asistente (funcionario)"
               :disable="!cliente"
               :extra-params="funcExtraParams"
+              :exclude-values="documentosAsignados"
+              :exclude-fields="['documento', 'nombre']"
               @pick="onFuncPick"
             />
             <q-btn
@@ -176,6 +180,31 @@ const funcExtraParams = computed(() => ({
   estado: 'Activo',
 }));
 
+/** Documentos / claves ya asignados para filtrar el lookup y validar duplicados. */
+const documentosAsignados = computed(() => {
+  const keys = new Set();
+  for (const r of props.rows || []) {
+    const doc = String(r.documento || '').trim();
+    if (doc) {
+      keys.add(doc);
+      if (doc.startsWith('SOP#')) keys.add(doc.slice(4));
+    }
+    const nom = String(r.nombre || '').trim();
+    if (nom) keys.add(nom);
+  }
+  return [...keys];
+});
+
+function yaAsignado(documento, nombre) {
+  const doc = String(documento || '').trim();
+  const nom = String(nombre || '').trim();
+  const assigned = documentosAsignados.value;
+  if (doc && assigned.includes(doc)) return true;
+  if (doc.startsWith('SOP#') && assigned.includes(doc.slice(4))) return true;
+  if (nom && assigned.includes(nom)) return true;
+  return false;
+}
+
 const cliMod = findModule('clientes');
 const funcModule = computed(() => ({
   resource: cliMod.detail.resource,
@@ -271,6 +300,10 @@ async function add() {
   }
   if (esCliente.value && !props.cliente) {
     $q.notify({ type: 'warning', message: 'Seleccione el cliente del acta' });
+    return;
+  }
+  if (yaAsignado(form.value.documento, form.value.nombre)) {
+    $q.notify({ type: 'warning', message: 'Este asistente ya está registrado en el acta' });
     return;
   }
 

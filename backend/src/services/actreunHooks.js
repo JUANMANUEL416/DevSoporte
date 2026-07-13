@@ -73,6 +73,21 @@ export async function beforeActreunAsistenteCreate(body) {
   }
   delete body._soporteCodigo;
   delete body._funcionarioDocumento;
+
+  const documento = String(body.documento || '').trim();
+  if (documento && body.consecutivo) {
+    const dup = await query(
+      `SELECT 1 FROM actreund
+       WHERE consecutivo = $1 AND TRIM(documento) = $2
+       LIMIT 1`,
+      [body.consecutivo, documento],
+    );
+    if (dup.rows.length) {
+      const err = new Error('Este asistente ya está registrado en el acta');
+      err.status = 409;
+      throw err;
+    }
+  }
 }
 
 export async function beforeActreunAsistenteUpdate(body, ids) {

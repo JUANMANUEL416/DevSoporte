@@ -41,6 +41,10 @@ const props = defineProps({
   disable: Boolean,
   extraParams: { type: Object, default: () => ({}) },
   lookupCodeField: { type: String, default: '' },
+  /** Valores a ocultar (p. ej. documentos o códigos ya asignados). */
+  excludeValues: { type: Array, default: () => [] },
+  /** Campos del row que se comparan contra excludeValues (además de valueField). */
+  excludeFields: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['update:modelValue', 'pick']);
@@ -48,6 +52,29 @@ const emit = defineEmits(['update:modelValue', 'pick']);
 const api = useResource(props.resource);
 const options = ref([]);
 const loading = ref(false);
+
+function excludeSet() {
+  return new Set(
+    (props.excludeValues || [])
+      .map((v) => String(v ?? '').trim())
+      .filter(Boolean),
+  );
+}
+
+function isExcluded(row, value) {
+  const excluded = excludeSet();
+  if (!excluded.size) return false;
+  const candidates = [value];
+  for (const field of props.excludeFields || []) {
+    const raw = row?.[field];
+    if (raw != null && String(raw).trim()) candidates.push(String(raw).trim());
+  }
+  // Técnicos de soporte: también SOP#codigo
+  if (row?.codigo != null && String(row.codigo).trim()) {
+    candidates.push(`SOP#${String(row.codigo).trim()}`);
+  }
+  return candidates.some((c) => excluded.has(String(c).trim()));
+}
 
 function toOption(row) {
   const code = row[props.valueField] ?? '';
@@ -67,7 +94,9 @@ async function loadOptions(q = '') {
   loading.value = true;
   try {
     const res = await api.list({ q, limit: 50, ...props.extraParams });
-    options.value = res.data.map(toOption);
+    options.value = res.data
+      .map(toOption)
+      .filter((opt) => !isExcluded(opt.row, opt.value));
   } finally {
     loading.value = false;
   }
@@ -91,6 +120,15 @@ function onPick(val) {
 
 watch(
   () => props.extraParams,
+  () => {
+    options.value = [];
+    loadOptions('');
+  },
+  { deep: true },
+);
+
+watch(
+  () => props.excludeValues,
   () => {
     options.value = [];
     loadOptions('');
