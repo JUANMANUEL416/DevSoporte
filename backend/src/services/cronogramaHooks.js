@@ -186,8 +186,17 @@ export async function beforeCronogramaItemUpdate(body, ids) {
     if (body.observacion === undefined && nextEstado !== prev.estado) body.observacion = '';
   }
 
-  if (body.fecha_probable !== undefined && body.fecha_probable !== null && body.fecha_probable !== '') {
-    await validateItemFechasEnRango(cnscrono, { fecha_probable: body.fecha_probable });
+  if (body.fecha_probable !== undefined && prev.tema_codigo) {
+    const fecha = body.fecha_probable === null || body.fecha_probable === ''
+      ? null
+      : body.fecha_probable;
+    if (fecha) {
+      await validateItemFechasEnRango(cnscrono, { fecha_probable: fecha });
+    }
+    await query(
+      'UPDATE cronocapd SET fecha_probable = $3 WHERE cnscrono = $1 AND tema_codigo = $2',
+      [cnscrono, prev.tema_codigo, fecha],
+    );
   }
 
   if (body.dirigidoa !== undefined && prev.tema_codigo) {

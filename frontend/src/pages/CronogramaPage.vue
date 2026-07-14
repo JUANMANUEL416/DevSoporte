@@ -241,13 +241,27 @@
                             <q-tooltip>Editar dirigido a</q-tooltip>
                           </q-btn>
                         </div>
-                        <div v-if="grupo.fecha_probable || grupo.hora_sugerida" class="tema-group__programacion">
-                          <span v-if="grupo.fecha_probable">
-                            F. probable: <strong>{{ fmtDateOnly(grupo.fecha_probable) }}</strong>
+                        <div class="tema-group__programacion">
+                          <span>
+                            F. probable:
+                            <strong>{{ grupo.fecha_probable ? fmtDateOnly(grupo.fecha_probable) : '—' }}</strong>
                           </span>
-                          <span v-if="grupo.hora_sugerida">
-                            Hora sugerida: <strong>{{ grupo.hora_sugerida }}</strong>
+                          <span>
+                            Hora:
+                            <strong>{{ grupo.hora_sugerida || '—' }}</strong>
                           </span>
+                          <q-btn
+                            v-if="isCronoEditable(props.row)"
+                            flat
+                            dense
+                            round
+                            size="xs"
+                            icon="edit_calendar"
+                            color="primary"
+                            @click.stop="openProgramacionDialog(props.row.cnscrono, grupo)"
+                          >
+                            <q-tooltip>Cambiar fecha y hora de asignación</q-tooltip>
+                          </q-btn>
                         </div>
                       </div>
                       <div class="tema-group__actions">
@@ -613,6 +627,56 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="programacionOpen" persistent>
+      <q-card style="min-width: 420px; max-width: 95vw">
+        <q-card-section>
+          <div class="text-h6">Fecha y hora de asignación</div>
+          <div v-if="programacionTemaNombre" class="text-caption text-grey q-mt-xs">
+            Tema: {{ programacionTemaNombre }}
+          </div>
+          <div v-if="programacionFechaMin && programacionFechaMax" class="text-caption text-grey">
+            Rango del cronograma: {{ programacionFechaMin }} — {{ programacionFechaMax }}
+          </div>
+        </q-card-section>
+        <q-card-section class="q-pt-none q-gutter-md">
+          <q-input
+            v-model="programacionFecha"
+            label="Fecha probable"
+            type="date"
+            outlined
+            dense
+            bg-color="white"
+            clearable
+            :min="programacionFechaMin || undefined"
+            :max="programacionFechaMax || undefined"
+            :rules="programacionFechaRules"
+          />
+          <q-input
+            v-model="programacionHora"
+            label="Hora sugerida"
+            type="time"
+            outlined
+            dense
+            bg-color="white"
+            clearable
+          />
+          <p class="text-caption text-grey-7">
+            Se aplica a todos los ítems de este tema.
+          </p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" v-close-popup />
+          <q-btn
+            unelevated
+            color="primary"
+            label="Guardar"
+            :loading="savingProgramacion"
+            @click="saveProgramacion"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -707,6 +771,16 @@ const dirigidoaItemRef = ref(null);
 const dirigidoaText = ref('');
 const savingDirigidoa = ref(false);
 
+const programacionOpen = ref(false);
+const programacionCnscrono = ref('');
+const programacionTemaNombre = ref('');
+const programacionItemRef = ref(null);
+const programacionFecha = ref('');
+const programacionHora = ref('');
+const programacionFechaMin = ref('');
+const programacionFechaMax = ref('');
+const savingProgramacion = ref(false);
+
 const currentItemRows = computed(() =>
   expandedCnscrono.value ? getItemRows(expandedCnscrono.value) : [],
 );
@@ -749,6 +823,15 @@ const agregarTemaFechaMin = computed(() =>
 const agregarTemaFechaMax = computed(() =>
   agregarTemaRow.value?.fecha_final ? toDateKey(agregarTemaRow.value.fecha_final) : undefined,
 );
+
+const programacionFechaRules = computed(() => {
+  const min = programacionFechaMin.value;
+  const max = programacionFechaMax.value;
+  if (!min || !max) return [];
+  return [
+    (v) => !v || (v >= min && v <= max) || `Debe estar entre ${min} y ${max}`,
+  ];
+});
 
 const agregarTemaFechaRules = computed(() => {
   const min = agregarTemaFechaMin.value;
@@ -1064,6 +1147,52 @@ async function saveDirigidoa() {
     });
   } finally {
     savingDirigidoa.value = false;
+  }
+}
+
+function openProgramacionDialog(cnscrono, grupo) {
+  const refItem = grupo.items[0];
+  if (!refItem) return;
+  const crono = findCronoRow(cnscrono);
+  programacionCnscrono.value = cnscrono;
+  programacionTemaNombre.value = grupo.tema_nombre || '';
+  programacionItemRef.value = { ...refItem };
+  programacionFecha.value = toDateKey(grupo.fecha_probable || refItem.fecha_probable) || '';
+  programacionHora.value = String(grupo.hora_sugerida || refItem.hora_sugerida || '').slice(0, 5);
+  programacionFechaMin.value = crono?.fecha_inicial ? toDateKey(crono.fecha_inicial) : '';
+  programacionFechaMax.value = crono?.fecha_final ? toDateKey(crono.fecha_final) : '';
+  programacionOpen.value = true;
+}
+
+async function saveProgramacion() {
+  if (!programacionItemRef.value) return;
+  const fecha = String(programacionFecha.value || '').trim();
+  const min = programacionFechaMin.value;
+  const max = programacionFechaMax.value;
+  if (fecha && min && max && (fecha < min || fecha > max)) {
+    $q.notify({
+      type: 'warning',
+      message: `La fecha probable debe estar entre ${min} y ${max}`,
+    });
+    return;
+  }
+  savingProgramacion.value = true;
+  try {
+    await itemApi.update(itemRowKey(programacionItemRef.value), {
+      ...programacionItemRef.value,
+      fecha_probable: fecha || null,
+      hora_sugerida: String(programacionHora.value || '').trim() || null,
+    });
+    programacionOpen.value = false;
+    $q.notify({ type: 'positive', message: 'Fecha y hora de asignación actualizadas' });
+    await loadItems(programacionCnscrono.value, true);
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudo guardar',
+    });
+  } finally {
+    savingProgramacion.value = false;
   }
 }
 
