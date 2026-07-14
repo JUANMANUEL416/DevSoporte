@@ -45,6 +45,7 @@ import {
   beforeCronogramaCreate,
   beforeCronogramaItemCreate,
   beforeCronogramaItemUpdate,
+  beforeCronogramaItemDelete,
   beforeCronogramaUpdate,
   beforeTemaItemCreate,
 } from './services/cronogramaHooks.js';
@@ -261,6 +262,7 @@ const entityHooks = {
   cronograma_items: {
     beforeCreate: beforeCronogramaItemCreate,
     beforeUpdate: beforeCronogramaItemUpdate,
+    beforeDelete: beforeCronogramaItemDelete,
   },
 };
 

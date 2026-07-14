@@ -89,6 +89,27 @@ export async function ensureCronogramaEditable(cnscrono) {
   return row;
 }
 
+function assertItemEditable(prev) {
+  if ((prev?.estado || 'Programado') === 'Realizado') {
+    const err = new Error('El ítem ya está cumplido (Realizado); no se permiten cambios');
+    err.status = 409;
+    throw err;
+  }
+}
+
+export async function beforeCronogramaItemDelete(ids) {
+  const cnscrono = ids[0];
+  const item = ids[1];
+  await ensureCronogramaEditable(cnscrono);
+  const current = await query(
+    'SELECT estado FROM cronocapd WHERE cnscrono = $1 AND item = $2',
+    [cnscrono, item],
+  );
+  const prev = current.rows[0];
+  if (!prev) return;
+  assertItemEditable(prev);
+}
+
 async function nextItem(table, pkCol, pkVal) {
   const res = await query(
     `SELECT COALESCE(MAX(item), 0)::int + 1 AS next_item FROM ${table} WHERE ${pkCol} = $1`,
@@ -160,6 +181,8 @@ export async function beforeCronogramaItemUpdate(body, ids) {
   const prev = current.rows[0];
   if (!prev) return;
 
+  assertItemEditable(prev);
+
   const nextEstado = body.estado !== undefined ? body.estado : prev.estado;
   if (nextEstado && !ITEM_ESTADOS.includes(nextEstado)) {
     const err = new Error(`Estado no válido: ${nextEstado}`);
@@ -194,21 +217,24 @@ export async function beforeCronogramaItemUpdate(body, ids) {
       await validateItemFechasEnRango(cnscrono, { fecha_probable: fecha });
     }
     await query(
-      'UPDATE cronocapd SET fecha_probable = $3 WHERE cnscrono = $1 AND tema_codigo = $2',
+      `UPDATE cronocapd SET fecha_probable = $3
+       WHERE cnscrono = $1 AND tema_codigo = $2 AND COALESCE(estado, 'Programado') <> 'Realizado'`,
       [cnscrono, prev.tema_codigo, fecha],
     );
   }
 
   if (body.dirigidoa !== undefined && prev.tema_codigo) {
     await query(
-      'UPDATE cronocapd SET dirigidoa = $3 WHERE cnscrono = $1 AND tema_codigo = $2',
+      `UPDATE cronocapd SET dirigidoa = $3
+       WHERE cnscrono = $1 AND tema_codigo = $2 AND COALESCE(estado, 'Programado') <> 'Realizado'`,
       [cnscrono, prev.tema_codigo, body.dirigidoa ?? ''],
     );
   }
 
   if (body.hora_sugerida !== undefined && prev.tema_codigo) {
     await query(
-      'UPDATE cronocapd SET hora_sugerida = $3 WHERE cnscrono = $1 AND tema_codigo = $2',
+      `UPDATE cronocapd SET hora_sugerida = $3
+       WHERE cnscrono = $1 AND tema_codigo = $2 AND COALESCE(estado, 'Programado') <> 'Realizado'`,
       [cnscrono, prev.tema_codigo, normalizeHora(body.hora_sugerida)],
     );
   }
@@ -328,7 +354,7 @@ export async function cambiarEstadoTemaCronograma(
   }
 
   const itemsRes = await query(
-    `SELECT item FROM cronocapd WHERE cnscrono = $1${whereTema} ORDER BY item`,
+    `SELECT item, estado FROM cronocapd WHERE cnscrono = $1${whereTema} ORDER BY item`,
     params,
   );
   if (!itemsRes.rows.length) {
@@ -337,15 +363,23 @@ export async function cambiarEstadoTemaCronograma(
     throw err;
   }
 
+  const editables = itemsRes.rows.filter((r) => (r.estado || 'Programado') !== 'Realizado');
+  if (!editables.length) {
+    const err = new Error('Todos los ítems del tema ya están cumplidos (Realizado); no se permiten cambios');
+    err.status = 409;
+    throw err;
+  }
+
   const payload = { estado, observacion, fecha_real: fechaReal };
   const updated = [];
-  for (const row of itemsRes.rows) {
+  for (const row of editables) {
     updated.push(await cambiarEstadoItemCronograma(cnscrono, row.item, payload));
   }
 
   return {
     tema: temaNombre || temaCodigo,
     count: updated.length,
+    omitidosRealizados: itemsRes.rows.length - editables.length,
     items: updated,
   };
 }

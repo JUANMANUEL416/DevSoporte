@@ -303,7 +303,10 @@
                       </template>
                       <template #body-cell-acciones="cell">
                         <q-td :props="cell" class="items-table__actions-cell">
-                          <div v-if="isCronoEditable(props.row)" class="crono-actions crono-actions--row">
+                          <div
+                            v-if="isCronoEditable(props.row) && isItemEditable(cell.row)"
+                            class="crono-actions crono-actions--row"
+                          >
                             <q-btn
                               flat
                               dense
@@ -335,6 +338,13 @@
                               <q-tooltip>Eliminar</q-tooltip>
                             </q-btn>
                           </div>
+                          <span
+                            v-else-if="isItemCumplido(cell.row)"
+                            class="text-positive text-caption"
+                          >
+                            Cumplido
+                            <q-tooltip>Ítem realizado: no admite cambios</q-tooltip>
+                          </span>
                           <span v-else class="text-grey-6 text-caption">—</span>
                         </q-td>
                       </template>
@@ -518,9 +528,10 @@
         </q-card-section>
         <q-card-section v-else-if="estadoDialogMode === 'tema' && estadoTemaGrupo">
           <p class="text-body2 q-mb-md">
-            Se aplicará el nuevo estado a los
-            <strong>{{ estadoTemaGrupo.items?.length || 0 }}</strong>
-            ítem(s) de este tema.
+            Se aplicará el nuevo estado a los ítems pendientes del tema
+            (<strong>{{ (estadoTemaGrupo.items || []).filter((i) => (i.estado || 'Programado') !== 'Realizado').length }}</strong>
+            de {{ estadoTemaGrupo.items?.length || 0 }}).
+            Los ítems ya cumplidos no se modifican.
           </p>
 
           <q-input
@@ -869,6 +880,14 @@ function isCronoEditable(row) {
   return (row?.estado || 'Borrador') !== 'Cerrado';
 }
 
+function isItemCumplido(row) {
+  return (row?.estado || 'Programado') === 'Realizado';
+}
+
+function isItemEditable(row) {
+  return !isItemCumplido(row);
+}
+
 function estadoCronoColor(estado) {
   const map = { Borrador: 'grey-6', Programado: 'primary', Cerrado: 'positive' };
   return map[estado] || 'grey';
@@ -1114,14 +1133,25 @@ async function confirmAgregarTema() {
 }
 
 function openItemEdit(row) {
+  if (!isItemEditable(row)) {
+    $q.notify({ type: 'warning', message: 'El ítem ya está cumplido; no se puede editar' });
+    return;
+  }
   itemCurrent.value = { ...row };
   itemIsEdit.value = true;
   formItemOpen.value = true;
 }
 
 function openDirigidoaDialog(cnscrono, grupo) {
-  const refItem = grupo.items[0];
+  const refItem = (grupo.items || []).find((i) => isItemEditable(i)) || grupo.items?.[0];
   if (!refItem) return;
+  if (!isItemEditable(refItem)) {
+    $q.notify({
+      type: 'warning',
+      message: 'Todos los ítems del tema ya están cumplidos; no se permiten cambios',
+    });
+    return;
+  }
   dirigidoaCnscrono.value = cnscrono;
   dirigidoaTemaNombre.value = grupo.tema_nombre || '';
   dirigidoaItemRef.value = { ...refItem };
@@ -1151,8 +1181,15 @@ async function saveDirigidoa() {
 }
 
 function openProgramacionDialog(cnscrono, grupo) {
-  const refItem = grupo.items[0];
+  const refItem = (grupo.items || []).find((i) => isItemEditable(i)) || grupo.items?.[0];
   if (!refItem) return;
+  if (!isItemEditable(refItem)) {
+    $q.notify({
+      type: 'warning',
+      message: 'Todos los ítems del tema ya están cumplidos; no se permiten cambios',
+    });
+    return;
+  }
   const crono = findCronoRow(cnscrono);
   programacionCnscrono.value = cnscrono;
   programacionTemaNombre.value = grupo.tema_nombre || '';
@@ -1197,6 +1234,10 @@ async function saveProgramacion() {
 }
 
 function confirmItemDelete(row) {
+  if (!isItemEditable(row)) {
+    $q.notify({ type: 'warning', message: 'El ítem ya está cumplido; no se puede eliminar' });
+    return;
+  }
   $q.dialog({
     title: 'Confirmar',
     message: '¿Eliminar este ítem del cronograma?',
@@ -1220,6 +1261,10 @@ function onItemSaved() {
 }
 
 function openEstadoItemDialog(row) {
+  if (!isItemEditable(row)) {
+    $q.notify({ type: 'warning', message: 'El ítem ya está cumplido; no se permiten cambios' });
+    return;
+  }
   estadoDialogMode.value = 'item';
   estadoTemaGrupo.value = null;
   estadoTemaCnscrono.value = '';
@@ -1231,6 +1276,14 @@ function openEstadoItemDialog(row) {
 }
 
 function openEstadoTemaDialog(cnscrono, grupo) {
+  const editables = (grupo?.items || []).filter((i) => isItemEditable(i));
+  if (!editables.length) {
+    $q.notify({
+      type: 'warning',
+      message: 'Todos los ítems del tema ya están cumplidos; no se permiten cambios',
+    });
+    return;
+  }
   estadoDialogMode.value = 'tema';
   estadoItemRow.value = null;
   estadoTemaGrupo.value = { ...grupo };
@@ -1276,9 +1329,12 @@ async function aplicarEstadoItem(estado) {
       };
       const result = await cronogramaApi.cambiarEstadoTema(cnscrono, temaPayload);
       estadoItemOpen.value = false;
+      const omitNote = result.omitidosRealizados
+        ? ` (${result.omitidosRealizados} cumplido(s) sin cambios)`
+        : '';
       $q.notify({
         type: 'positive',
-        message: `Estado del tema actualizado (${result.count} ítem(s)): ${estado}`,
+        message: `Estado del tema actualizado (${result.count} ítem(s)): ${estado}${omitNote}`,
       });
     } else {
       cnscrono = estadoItemRow.value.cnscrono;
