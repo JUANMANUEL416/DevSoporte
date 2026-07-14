@@ -360,15 +360,15 @@
               </div>
             </section>
 
-            <section v-if="isActreunFirmasMode && firmasOmitidosPreview.length" class="notify-dialog__section q-mb-sm">
+            <section v-if="(isFirmasSemanaMode || isActreunFirmasMode) && firmasOmitidosPreview.length" class="notify-dialog__section q-mb-sm">
               <q-banner dense rounded class="bg-orange-1 text-orange-10">
-                <div class="text-weight-medium q-mb-xs">No se enviará a {{ firmasOmitidosPreview.length }} asistente(s):</div>
+                <div class="text-weight-medium q-mb-xs">No se enviará a {{ firmasOmitidosPreview.length }} destinatario(s):</div>
                 <div
-                  v-for="o in firmasOmitidosPreview"
-                  :key="`omit-${o.item}`"
+                  v-for="(o, idx) in firmasOmitidosPreview"
+                  :key="`omit-${o.item || o.funcionarioKey || idx}`"
                   class="text-caption"
                 >
-                  {{ o.nombre || '—' }} — {{ o.motivo || 'Sin datos' }}
+                  {{ o.nombre || o.funcionario || '—' }} — {{ o.motivo || 'Sin datos' }}
                 </div>
               </q-banner>
             </section>
@@ -688,14 +688,19 @@ const previewSample = computed(() => {
   if (isFirmasSemanaMode.value) {
     const para = allContactosTo.value
       .filter((c) => selectedTo.value.includes(c.email))
-      .map((c) => c.email)
-      .join(', ') || '(sin equipo con email)';
-    const gruposNote = firmasGruposPreview.value.length
-      ? `\n\nPDF por funcionario:\n${firmasGruposPreview.value.map((g) =>
-        `- ${g.funcionario}: ${g.totalSoportes} soporte(s), ${g.pendientesFirma} pendiente(s)`,
+      .map((c) => `${c.nombre || c.email} <${c.email}>`)
+      .join('\n      ') || '(sin funcionarios con correo)';
+    const omitNote = firmasOmitidosPreview.value.length
+      ? `\n\nOmitidos (${firmasOmitidosPreview.value.length}):\n${firmasOmitidosPreview.value.map((o) =>
+        `- ${o.funcionario || '—'}: ${o.motivo || 'Sin datos'}`,
       ).join('\n')}`
       : '';
-    return `Para: ${para}\n\nAsunto: ${subject.value}\n\n${body}${gruposNote}\n\n(Adjuntos: PDF por funcionario + enlaces de firma en el correo)`;
+    const gruposNote = firmasGruposPreview.value.length
+      ? `\n\nPDF personal por funcionario:\n${firmasGruposPreview.value.map((g) =>
+        `- ${g.funcionario}${g.email ? ` <${g.email}>` : ''}: ${g.pendientesFirma} pendiente(s)`,
+      ).join('\n')}`
+      : '';
+    return `Para:\n      ${para}\n\nAsunto: ${subject.value}\n\n${body}${gruposNote}${omitNote}\n\n(Cada funcionario recibe su PDF y un enlace personal de firma.)`;
   }
   if (isActreunFirmasMode.value) {
     const seleccionados = allContactosTo.value.filter((c) => selectedTo.value.includes(c.email));
@@ -839,15 +844,22 @@ watch(
       }
 
       if (isFirmasSemanaMode.value) {
-        const [destData, previewData] = await Promise.all([
-          clientesApi.destinatarios(props.clienteCodigo),
-          bitacoraApi.previewFirmasSemana(props.recordId, props.clienteCodigo),
-        ]);
-        clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
+        const previewData = await bitacoraApi.previewFirmasSemana(props.recordId, props.clienteCodigo);
+        clienteNombre.value = previewData.nombrecliente || props.clienteCodigo;
         firmasGruposPreview.value = Array.isArray(previewData.grupos) ? previewData.grupos : [];
-        contactosTo.value = (destData.equipoConEmail || []).map((c, i) => ({
-          ...c,
-          id: `to-${i}-${c.email}`,
+        firmasOmitidosPreview.value = Array.isArray(previewData.omitidos)
+          ? previewData.omitidos.map((o) => ({
+            ...o,
+            nombre: o.funcionario || o.nombre,
+          }))
+          : [];
+        contactosTo.value = (previewData.enviables || []).map((p, i) => ({
+          id: `func-${p.funcionarioKey || i}`,
+          email: p.email,
+          nombre: p.funcionario || p.email,
+          cargo: p.cargo || 'Funcionario solicitante',
+          documento: p.documento,
+          funcionarioKey: p.funcionarioKey,
         }));
         contactosCc.value = [];
         selectedTo.value = contactosTo.value.map((c) => c.email);
@@ -859,7 +871,9 @@ watch(
         if (!contactosTo.value.length) {
           $q.notify({
             type: 'warning',
-            message: 'El equipo no tiene correos registrados. Agregue uno manualmente en Para.',
+            message: firmasOmitidosPreview.value.length
+              ? 'Ningún funcionario pendiente tiene correo y documento válidos. Revise Clientes → Funcionarios.'
+              : 'No hay firmas pendientes por enviar.',
           });
         }
         return;

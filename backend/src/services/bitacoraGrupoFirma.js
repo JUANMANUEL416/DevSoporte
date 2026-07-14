@@ -97,7 +97,7 @@ export async function buildGrupoPdfAttachment(cnsbite, cliente, group) {
   };
 }
 
-async function loadFuncionarioByKey(cliente, funcionarioKey, sampleRow) {
+export async function loadFuncionarioByKey(cliente, funcionarioKey, sampleRow) {
   if (funcionarioKey === '__sin_funcionario__') return null;
   const fakeBita = { cliente, funcionario: sampleRow?.funcionario || displayFuncionarioKey(funcionarioKey) };
   return loadFuncionarioDestinatario(fakeBita);

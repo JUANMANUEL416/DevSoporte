@@ -1375,7 +1375,7 @@ function firmasSemanaTooltip(group) {
   const pendientes = countPendientesGrupo(group);
   if (pendientes > 0) return `${pendientes} soporte(s) aún no terminado(s)`;
   if (countSinFirmaGrupo(group) === 0) return 'Todos los soportes ya están firmados';
-  return 'Enviar PDF y enlaces de firma al equipo';
+  return 'Enviar PDF y enlace de firma a cada funcionario';
 }
 
 function openFirmasSemana(weekRow, group) {
@@ -1435,7 +1435,7 @@ async function onNotifySend(payload) {
         message: notifyType.value === 'bitacora_semana'
           ? `Reporte enviado al equipo${pdfNote}`
           : notifyType.value === 'bitacora_firmas_semana'
-            ? `Correo de firmas enviado al equipo${pdfCountNote}`
+            ? `Firmas enviadas a ${data.sent} funcionario(s)${pdfCountNote}`
             : `${data.sent} correo(s) enviado(s)`,
       });
       if (notifyType.value === 'bitacora_firmas_semana' && notifyCnsbite.value) {

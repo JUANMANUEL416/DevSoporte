@@ -22,6 +22,7 @@ import {
   buildGrupoPdfAttachment,
   createBitacoraGrupoFirmaLink,
   displayFuncionarioKey,
+  loadFuncionarioByKey,
 } from './bitacoraGrupoFirma.js';
 import { formatNombreConTratamiento } from './saludo.js';
 import { buildImagenesEmailPayload, parseImagenesSoporte } from './bitacoraImagenes.js';
@@ -856,7 +857,7 @@ export async function enviarNotificacionSemanaCliente(cnsbite, cliente, body = {
 async function buildGruposFirmaSemanaData(cnsbite, cliente) {
   const evaluacion = await evaluarEnvioFirmasSemanaCliente(cnsbite, cliente);
   if (!evaluacion.pendientes.length) {
-    const err = new Error('Todos los soportes terminados ya están firmados');
+    const err = new Error('Todos los soportes terminados ya fueron firmados');
     err.status = 400;
     throw err;
   }
@@ -870,22 +871,42 @@ async function buildGruposFirmaSemanaData(cnsbite, cliente) {
 
   const grupos = [];
   for (const g of evaluacion.groups) {
-    const cnssoportes = g.items.map((i) => i.cnssoporte);
-    const pendientesFirma = g.items.filter((s) => !hasFirmaAceptacion(s)).length;
-    const firmados = g.items.length - pendientesFirma;
-    const pdf = await buildGrupoPdfAttachment(cnsbite, cliente, g);
+    const pendientesItems = g.items.filter((s) => !hasFirmaAceptacion(s));
+    const pendientesFirma = pendientesItems.length;
+    if (pendientesFirma === 0) continue;
+
+    const cnssoportes = pendientesItems.map((i) => i.cnssoporte);
+    const pdf = await buildGrupoPdfAttachment(cnsbite, cliente, {
+      ...g,
+      items: pendientesItems,
+    });
     const linkFirma = createBitacoraGrupoFirmaLink({
       cnsbite,
       cliente,
       funcionarioKey: g.funcionarioKey,
       cnssoportes,
     });
+    const func = await loadFuncionarioByKey(cliente, g.funcionarioKey, g.items[0]);
+    const email = String(func?.email || '').trim() || null;
+    const documento = String(func?.documento || '').trim() || null;
+    let motivo = '';
+    if (g.funcionarioKey === '__sin_funcionario__') motivo = 'Sin funcionario en el soporte';
+    else if (!func) motivo = 'Funcionario no encontrado en clientes';
+    else if (!email) motivo = 'Sin correo';
+    else if (!documento) motivo = 'Sin documento';
+
     grupos.push({
       funcionario: g.funcionario || displayFuncionarioKey(g.funcionarioKey),
       funcionarioKey: g.funcionarioKey,
-      totalSoportes: g.items.length,
+      email,
+      documento,
+      cargo: func?.cargo || 'Funcionario solicitante',
+      tratamiento: func?.tratamiento || '',
+      puedeEnviar: Boolean(email && documento),
+      motivo,
+      totalSoportes: pendientesFirma,
       pendientesFirma,
-      firmados,
+      firmados: g.items.length - pendientesFirma,
       pdfNombre: pdf.filename,
       linkFirma,
       pdf,
@@ -895,38 +916,36 @@ async function buildGruposFirmaSemanaData(cnsbite, cliente) {
   return { evaluacion, data, grupos };
 }
 
-function buildFirmasSemanaClienteEmailBundle(encabezado, clienteRow, bodyTemplate, { grupos, pdfFilenames, idsemana } = {}) {
+function buildFirmasSemanaClienteEmailBundle(encabezado, clienteRow, bodyTemplate, { grupo, idsemana } = {}) {
   const nombreCliente = clienteRow?.nombrecliente || encabezado?.nombrecliente || encabezado?.cliente || '—';
+  const funcionarioNombre = grupo?.funcionario || 'funcionario';
   const subject = `Firmas pendientes — Semana ${idsemana || encabezado?.idsemana || ''} — ${nombreCliente}`;
   const defaultBody = `Hola {{nombre}},
 
-Adjuntamos los PDF de soporte de la semana ${idsemana || encabezado?.idsemana || ''} para ${nombreCliente}, agrupados por funcionario solicitante.
+Adjuntamos el PDF de sus soportes de la semana ${idsemana || encabezado?.idsemana || ''} para ${nombreCliente}.
 
-Cada funcionario debe firmar sus soportes con el enlace correspondiente (documento de identidad requerido). Los soportes ya firmados no pueden volver a firmarse.`;
+Revise el documento y firme digitalmente con el enlace personal. Deberá ingresar su número de documento. Los soportes ya firmados no pueden volver a firmarse.`;
   const introTemplate = extractIntroFromBody(String(bodyTemplate || '').trim() || defaultBody, defaultBody);
   const rows = [
     { label: 'Cliente', value: nombreCliente },
     { label: 'Semana', value: idsemana || encabezado?.idsemana || '—' },
     { label: 'Consecutivo', value: encabezado?.cnsbite || '—' },
     { label: 'Periodo', value: `${fmtFecha(encabezado?.fechaini)} — ${fmtFecha(encabezado?.fechafin)}` },
-    { label: 'Funcionarios', value: String(grupos?.length || 0) },
-    { label: 'Pendientes de firma', value: String(grupos?.reduce((n, g) => n + g.pendientesFirma, 0) || 0) },
+    { label: 'Funcionario', value: funcionarioNombre },
+    { label: 'Pendientes de firma', value: String(grupo?.pendientesFirma || 0) },
   ];
-  const linkRows = (grupos || [])
-    .filter((g) => g.pendientesFirma > 0)
-    .map((g) => ({
-      label: `${g.funcionario} (${g.pendientesFirma} pend.)`,
-      href: g.linkFirma,
-    }));
-  const calloutText = pdfFilenames?.length
-    ? `Adjuntos: ${pdfFilenames.join(', ')}`
-    : 'Los PDF por funcionario van incluidos en este correo.';
+  const linkRows = grupo?.linkFirma
+    ? [{ label: `Firmar soportes (${grupo.pendientesFirma} pend.)`, href: grupo.linkFirma }]
+    : [];
+  const calloutText = grupo?.pdfNombre
+    ? `Adjunto: ${grupo.pdfNombre}`
+    : 'El PDF de sus soportes va incluido en este correo.';
 
   return {
     subject,
     body: applyNombreTemplate(introTemplate, '{{nombre}}'),
     buildForRecipient(destinatario) {
-      const saludo = destinatario?.nombre || 'estimado(a)';
+      const saludo = destinatario?.nombre || funcionarioNombre || 'estimado(a)';
       const introText = stripLeadingGreeting(applyNombreTemplate(introTemplate, saludo));
       const greeting = `Hola ${saludo},`;
       const html = buildNotificationEmailHtml({
@@ -939,16 +958,21 @@ Cada funcionario debe firmar sus soportes con el enlace correspondiente (documen
         introText,
         rows,
         linkRows,
-        calloutTitle: 'Documentos adjuntos',
+        calloutTitle: 'Documento adjunto',
         calloutText,
-        footerNote: 'Comparta cada enlace con el funcionario correspondiente. Los soportes ya firmados no admiten cambios.',
+        actionButton: grupo?.linkFirma
+          ? { href: grupo.linkFirma, label: 'Firmar mis soportes' }
+          : undefined,
+        footerNote: 'Este enlace es personal. Al abrirlo se pedirá su número de documento.',
       });
       const plainLinks = linkRows.map((r) => `${r.label}: ${r.href}`).join('\n');
       const text = buildPlainNotificationEmail({
         greeting,
         introText,
         rows,
-        calloutText: `${calloutText}${plainLinks ? `\n\nEnlaces de firma:\n${plainLinks}` : ''}`,
+        calloutText: `${calloutText}${plainLinks ? `\n\nEnlace de firma:\n${plainLinks}` : ''}`,
+        actionUrl: grupo?.linkFirma,
+        actionLabel: 'Firmar mis soportes',
       });
       return { text, html };
     },
@@ -965,13 +989,15 @@ export async function previewNotificacionFirmasSemanaCliente(cnsbite, cliente) {
 
   const { data, grupos } = await buildGruposFirmaSemanaData(cnsbite, cliente);
   const clienteRow = await loadCliente(cliente);
+  const enviables = grupos.filter((g) => g.puedeEnviar);
+  const omitidos = grupos.filter((g) => !g.puedeEnviar);
+  const sample = enviables[0] || grupos[0] || null;
   const bundle = buildFirmasSemanaClienteEmailBundle(
     data.encabezado,
     clienteRow,
     '',
     {
-      grupos,
-      pdfFilenames: grupos.map((g) => g.pdfNombre),
+      grupo: sample,
       idsemana: data.encabezado.idsemana,
     },
   );
@@ -979,8 +1005,30 @@ export async function previewNotificacionFirmasSemanaCliente(cnsbite, cliente) {
   return {
     subject: bundle.subject,
     body: bundle.body,
+    nombrecliente: clienteRow?.nombrecliente || cliente,
+    enviables: enviables.map((g) => ({
+      funcionario: g.funcionario,
+      funcionarioKey: g.funcionarioKey,
+      email: g.email,
+      documento: g.documento,
+      cargo: g.cargo,
+      totalSoportes: g.totalSoportes,
+      pendientesFirma: g.pendientesFirma,
+      firmados: g.firmados,
+      pdfNombre: g.pdfNombre,
+      linkFirma: g.linkFirma,
+    })),
+    omitidos: omitidos.map((g) => ({
+      funcionario: g.funcionario,
+      funcionarioKey: g.funcionarioKey,
+      motivo: g.motivo || 'Sin datos',
+      pendientesFirma: g.pendientesFirma,
+    })),
     grupos: grupos.map((g) => ({
       funcionario: g.funcionario,
+      email: g.email,
+      puedeEnviar: g.puedeEnviar,
+      motivo: g.motivo || '',
       totalSoportes: g.totalSoportes,
       pendientesFirma: g.pendientesFirma,
       firmados: g.firmados,
@@ -1002,43 +1050,91 @@ export async function enviarFirmasSemanaCliente(cnsbite, cliente, body = {}, usu
   const clienteRow = await loadCliente(cliente);
   const toEmails = collectEmailList(body, 'emails', 'extraEmails');
   if (!toEmails.length) {
-    const err = new Error('Seleccione al menos un destinatario del equipo (Para)');
+    const err = new Error('Seleccione al menos un funcionario con correo (Para)');
     err.status = 400;
     throw err;
   }
 
-  const toList = resolveEquipoDestinatarios(clienteRow, toEmails);
-  const attachments = grupos.map((g) => ({
-    filename: g.pdf.filename,
-    content: g.pdf.content,
-    contentType: 'application/pdf',
-  }));
-  const bundle = buildFirmasSemanaClienteEmailBundle(
-    data.encabezado,
-    clienteRow,
-    String(body.body || '').trim(),
-    {
-      grupos,
-      pdfFilenames: grupos.map((g) => g.pdfNombre),
-      idsemana: data.encabezado.idsemana,
-    },
+  const selected = new Set(toEmails.map((e) => e.toLowerCase()));
+  const candidatos = grupos.filter(
+    (g) => g.puedeEnviar && g.email && selected.has(g.email.toLowerCase()),
   );
-  const subject = String(body.subject || '').trim() || bundle.subject;
 
-  return sendActaCapacitacionEmail({
-    toList,
-    ccList: [],
-    subject,
-    buildMessage: () => bundle.buildForRecipient({
-      nombre: toList[0]?.nombre || 'equipo',
-    }),
-    attachments,
-    meta: {
-      cliente,
-      nombrecliente: clienteRow?.nombrecliente || null,
-      contexto: 'bitacora_firmas_semana',
-      referencia: cnsbite,
-      usuario,
-    },
-  });
+  if (!candidatos.length) {
+    return {
+      sent: 0,
+      total: 0,
+      details: [],
+      error: 'Ningún funcionario seleccionado tiene correo y documento válidos para firmar',
+      omitidos: grupos.filter((g) => !g.puedeEnviar),
+    };
+  }
+
+  let sent = 0;
+  const details = [];
+  const subjectTpl = String(body.subject || '').trim();
+  const bodyTpl = String(body.body || '').trim();
+
+  for (const g of candidatos) {
+    const bundle = buildFirmasSemanaClienteEmailBundle(
+      data.encabezado,
+      clienteRow,
+      bodyTpl,
+      {
+        grupo: g,
+        idsemana: data.encabezado.idsemana,
+      },
+    );
+    const subject = subjectTpl || bundle.subject;
+    const destinatario = {
+      email: g.email,
+      nombre: formatNombreConTratamiento(g.tratamiento, g.funcionario) || g.funcionario,
+    };
+    try {
+      const { text, html } = bundle.buildForRecipient(destinatario);
+      await sendMail({
+        to: g.email,
+        subject: applyNombreTemplate(subject, destinatario.nombre),
+        text,
+        html,
+        attachments: [{
+          filename: g.pdf.filename,
+          content: g.pdf.content,
+          contentType: 'application/pdf',
+        }],
+        meta: {
+          cliente,
+          nombrecliente: clienteRow?.nombrecliente || null,
+          contexto: 'bitacora_firmas_semana',
+          referencia: cnsbite,
+          usuario,
+          cuerpo: text,
+        },
+      });
+      sent += 1;
+      details.push({
+        email: g.email,
+        nombre: g.funcionario,
+        ok: true,
+        message: `Enviado (${g.pendientesFirma} pendiente(s))`,
+      });
+    } catch (err) {
+      details.push({
+        email: g.email,
+        nombre: g.funcionario,
+        ok: false,
+        message: err.message,
+      });
+    }
+  }
+
+  return {
+    sent,
+    total: candidatos.length,
+    details,
+    pdfAttached: sent > 0,
+    pdfCount: sent,
+    omitidos: grupos.filter((g) => !g.puedeEnviar),
+    error: sent === 0 ? 'No se envió ningún correo de firma' : null,
+  };
 }

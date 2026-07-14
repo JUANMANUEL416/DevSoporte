@@ -13,12 +13,20 @@ export async function loadFuncionarioDestinatario(bita) {
      FROM clief
      WHERE codigo = $1
        AND LOWER(TRIM(nombre)) = LOWER(TRIM($2))
-       AND email IS NOT NULL AND TRIM(email) <> ''
-     ORDER BY documento
+     ORDER BY
+       CASE WHEN email IS NOT NULL AND TRIM(email) <> '' THEN 0 ELSE 1 END,
+       documento
      LIMIT 1`,
     [bita.cliente, bita.funcionario],
   );
   return res.rows[0] || null;
+}
+
+/** Solo si tiene correo usable como destinatario de notificación. */
+export async function loadFuncionarioConEmail(bita) {
+  const row = await loadFuncionarioDestinatario(bita);
+  if (!row?.email?.trim()) return null;
+  return row;
 }
 
 export async function loadBitacoraFirmaContext(cnssoporte) {
