@@ -83,10 +83,12 @@
           <q-card flat bordered class="actreun-section q-mb-md">
             <q-card-section class="actreun-section__head">
               <q-icon name="description" size="18px" color="primary" />
-              <div>
+              <div class="col">
                 <div class="actreun-section__title">Motivo y desarrollo</div>
                 <div class="actreun-section__subtitle">Contenido principal que aparecerá en el PDF del acta</div>
               </div>
+              <q-space />
+              <DictadoButton :active="open" @dictado="onDesarrolloDictado" />
             </q-card-section>
             <q-separator />
             <q-card-section>
@@ -181,6 +183,8 @@ import { useResource } from 'src/services/api';
 import LookupSelect from 'components/LookupSelect.vue';
 import ActaReunionCompromisosPanel from 'components/ActaReunionCompromisosPanel.vue';
 import ActaReunionAsistentesPanel from 'components/ActaReunionAsistentesPanel.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoHtml } from 'src/composables/useDictado';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -304,6 +308,10 @@ async function persistDetalle(consecutivo) {
       ...(a.lado === 'cliente' && a.documento ? { _funcionarioDocumento: a.documento } : {}),
     });
   }
+}
+
+function onDesarrolloDictado(text) {
+  form.value.desarrollo = appendDictadoHtml(form.value.desarrollo, text);
 }
 
 async function save() {

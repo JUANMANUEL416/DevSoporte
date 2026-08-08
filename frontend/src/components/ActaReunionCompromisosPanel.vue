@@ -18,7 +18,11 @@
 
       <div class="row q-col-gutter-sm q-mb-sm">
       <div class="col-12 col-md-5">
-        <q-input v-model="form.compromiso" label="Compromiso *" dense outlined />
+        <q-input v-model="form.compromiso" label="Compromiso *" dense outlined>
+          <template #append>
+            <DictadoButton @dictado="onCompromisoDictado" />
+          </template>
+        </q-input>
       </div>
       <div class="col-12 col-md-3">
         <LookupSelect
@@ -136,7 +140,20 @@
               <q-badge :color="editEsCliente ? 'teal' : 'deep-orange'" :label="editEsCliente ? 'Cliente' : 'IX Colombia'" />
             </div>
           </div>
-          <q-input v-model="editForm.compromiso" label="Compromiso *" outlined dense type="textarea" autogrow rows="2" class="q-mb-sm" />
+          <q-input
+            v-model="editForm.compromiso"
+            label="Compromiso *"
+            outlined
+            dense
+            type="textarea"
+            autogrow
+            rows="2"
+            class="q-mb-sm"
+          >
+            <template #append>
+              <DictadoButton :active="editOpen" @dictado="onEditCompromisoDictado" />
+            </template>
+          </q-input>
           <LookupSelect
             v-if="!editEsCliente"
             v-model="editForm.responsable"
@@ -195,6 +212,8 @@ import { useResource } from 'src/services/api';
 import { findModule } from 'src/config/modules';
 import LookupSelect from 'components/LookupSelect.vue';
 import GenericForm from 'components/GenericForm.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoPlain } from 'src/composables/useDictado';
 
 const props = defineProps({
   consecutivo: { type: String, default: '' },
@@ -251,6 +270,14 @@ function emptyForm() {
     fecha_inicio: new Date().toISOString().slice(0, 10),
     fecha_entrega: '',
   };
+}
+
+function onCompromisoDictado(text) {
+  form.value.compromiso = appendDictadoPlain(form.value.compromiso, text);
+}
+
+function onEditCompromisoDictado(text) {
+  editForm.value.compromiso = appendDictadoPlain(editForm.value.compromiso, text);
 }
 
 function rowKey(row) {
