@@ -2,10 +2,10 @@
   <q-dialog
     v-model="open"
     persistent
-    :maximized="!isEdit"
+    maximized
     class="actreun-form-dialog"
   >
-    <q-card class="actreun-form-card" :class="{ 'actreun-form-card--fullscreen': !isEdit }">
+    <q-card class="actreun-form-card actreun-form-card--fullscreen">
       <div class="actreun-form-card__header">
         <div class="actreun-form-card__header-main">
           <q-icon :name="isEdit ? 'edit_note' : 'groups'" size="18px" class="actreun-form-card__header-icon" />
@@ -96,7 +96,7 @@
               <q-editor
                 v-model="form.desarrollo"
                 class="actreun-form__editor"
-                :min-height="isEdit ? '200px' : '240px'"
+                :min-height="isEdit ? '320px' : '280px'"
                 :toolbar="editorToolbar"
                 placeholder="Describa el motivo y el desarrollo de la reunión..."
               />
@@ -176,6 +176,15 @@
         <q-space />
       </q-card-actions>
     </q-card>
+
+    <ActaCompromisosPreviewDialog
+      v-model="previewOpen"
+      :compromisos="previewCompromisos"
+      :cliente="form.cliente"
+      :loading="previewSaving"
+      @confirm="onPreviewConfirm"
+      @cancel="onPreviewCancel"
+    />
   </q-dialog>
 </template>
 
@@ -188,7 +197,9 @@ import ActaReunionCompromisosPanel from 'components/ActaReunionCompromisosPanel.
 import ActaReunionAsistentesPanel from 'components/ActaReunionAsistentesPanel.vue';
 import DictadoButton from 'components/DictadoButton.vue';
 import AiActaAssistMenu from 'components/AiActaAssistMenu.vue';
+import ActaCompromisosPreviewDialog from 'components/ActaCompromisosPreviewDialog.vue';
 import { appendDictadoHtml } from 'src/composables/useDictado';
+import { dateInputOrNull } from 'src/utils/dateInput';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -206,6 +217,10 @@ const saving = ref(false);
 const localCompromisos = ref([]);
 const localAsistentes = ref([]);
 const editCompromisosRows = ref([]);
+const previewOpen = ref(false);
+const previewCompromisos = ref([]);
+const previewSaving = ref(false);
+let previewResolve = null;
 
 const editorToolbar = [
   ['bold', 'italic', 'underline'],
@@ -394,14 +409,15 @@ async function insertCompromisosSugeridos(compromisos) {
 
   for (const c of compromisos) {
     const compromiso = String(c?.compromiso || '').trim();
-    if (!compromiso) continue;
+    const responsable = String(c?.responsable || '').trim();
+    if (!compromiso || !responsable) continue;
 
     const payload = {
-      lado: 'ix',
+      lado: c.lado === 'cliente' || c.esCliente ? 'cliente' : 'ix',
       compromiso,
-      responsable: String(c?.responsable || '').trim() || 'Por definir',
-      fecha_inicio: today,
-      fecha_entrega: c?.fecha_entrega || null,
+      responsable,
+      fecha_inicio: dateInputOrNull(c.fecha_inicio) || today,
+      fecha_entrega: dateInputOrNull(c.fecha_entrega),
     };
 
     if (consecutivo) {
@@ -436,29 +452,34 @@ function aplicarCompromisosSugeridos(compromisos) {
       return;
     }
 
-    const lista = compromisos.map((c, i) => `${i + 1}. ${c.compromiso}`).join('\n');
+    previewCompromisos.value = compromisos;
+    previewResolve = resolve;
 
-    // Esperar cierre del diálogo de confirmación IA antes de abrir el siguiente
     setTimeout(() => {
-      $q.dialog({
-        title: `${compromisos.length} compromiso(s) sugerido(s)`,
-        message: `${lista}\n\n¿Agregar todos al acta?`,
-        cancel: { label: 'Cancelar', flat: true, noCaps: true },
-        ok: { label: 'Agregar todos', color: 'primary', unelevated: true, noCaps: true },
-        persistent: true,
-      })
-        .onOk(async () => {
-          try {
-            await insertCompromisosSugeridos(compromisos);
-            resolve(true);
-          } catch (err) {
-            $q.notify({ type: 'negative', message: extractApiError(err, 'Error al agregar compromisos') });
-            resolve(false);
-          }
-        })
-        .onCancel(() => resolve(false));
+      previewOpen.value = true;
     }, 400);
   });
+}
+
+function onPreviewCancel() {
+  previewOpen.value = false;
+  previewResolve?.(false);
+  previewResolve = null;
+}
+
+async function onPreviewConfirm(rows) {
+  previewSaving.value = true;
+  try {
+    await insertCompromisosSugeridos(rows);
+    previewOpen.value = false;
+    previewResolve?.(true);
+  } catch (err) {
+    $q.notify({ type: 'negative', message: extractApiError(err, 'Error al agregar compromisos') });
+    previewResolve?.(false);
+  } finally {
+    previewSaving.value = false;
+    previewResolve = null;
+  }
 }
 
 async function save() {
