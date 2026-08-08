@@ -103,7 +103,7 @@
             </q-card-section>
           </q-card>
 
-          <template v-if="!isEdit">
+          <template v-if="showCompromisosSection">
             <q-card flat bordered class="actreun-section q-mb-md">
               <q-card-section class="actreun-section__head">
                 <q-icon name="assignment_turned_in" size="18px" color="primary" />
@@ -118,16 +118,18 @@
               <q-card-section>
                 <ActaReunionCompromisosPanel
                   :cliente="form.cliente"
-                  :rows="localCompromisos"
-                  local-mode
+                  :consecutivo="isEdit ? record.consecutivo : ''"
+                  :rows="isEdit ? editCompromisosRows : localCompromisos"
+                  :local-mode="!isEdit"
                   @add="onAddCompromiso"
                   @remove="onRemoveCompromiso"
                   @update="onUpdateCompromiso"
+                  @changed="loadEditCompromisos"
                 />
               </q-card-section>
             </q-card>
 
-            <q-card flat bordered class="actreun-section">
+            <q-card v-if="!isEdit" flat bordered class="actreun-section">
               <q-card-section class="actreun-section__head">
                 <q-icon name="people" size="18px" color="primary" />
                 <div>
@@ -193,7 +195,7 @@ const props = defineProps({
   record: { type: Object, default: () => ({}) },
   isEdit: Boolean,
 });
-const emit = defineEmits(['update:modelValue', 'saved']);
+const emit = defineEmits(['update:modelValue', 'saved', 'compromisos-changed']);
 
 const $q = useQuasar();
 const api = useResource('actas_reunion');
@@ -203,6 +205,7 @@ const formRef = ref(null);
 const saving = ref(false);
 const localCompromisos = ref([]);
 const localAsistentes = ref([]);
+const editCompromisosRows = ref([]);
 
 const editorToolbar = [
   ['bold', 'italic', 'underline'],
@@ -213,6 +216,11 @@ const editorToolbar = [
 const open = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
+});
+
+const showCompromisosSection = computed(() => {
+  if (!props.isEdit) return true;
+  return (props.record?.estado || 'Abierta') === 'Abierta';
 });
 
 const form = ref(emptyForm());
@@ -237,10 +245,11 @@ function toDateInput(v) {
 
 watch(
   () => props.modelValue,
-  (v) => {
+  async (v) => {
     if (!v) return;
     localCompromisos.value = [];
     localAsistentes.value = [];
+    editCompromisosRows.value = [];
     if (props.isEdit && props.record?.consecutivo) {
       form.value = {
         fecha: toDateInput(props.record.fecha),
@@ -250,6 +259,9 @@ watch(
         version: props.record.version || '1',
         desarrollo: props.record.desarrollo || '',
       };
+      if (showCompromisosSection.value) {
+        await loadEditCompromisos();
+      }
     } else {
       form.value = emptyForm();
     }
@@ -264,6 +276,16 @@ const estadoColor = computed(() => (estadoLabel.value === 'Abierta' ? 'primary' 
 
 function onAddCompromiso(row) {
   localCompromisos.value = [...localCompromisos.value, row];
+}
+
+async function loadEditCompromisos() {
+  if (!props.isEdit || !props.record?.consecutivo) return;
+  try {
+    const res = await compApi.list({ consecutivo: props.record.consecutivo, limit: 200 });
+    editCompromisosRows.value = res.data || [];
+  } catch (err) {
+    $q.notify({ type: 'negative', message: extractApiError(err, 'Error al cargar compromisos') });
+  }
 }
 
 function onRemoveCompromiso(row) {
@@ -357,46 +379,81 @@ async function onActaAiAccion(accion) {
   });
 }
 
-async function aplicarCompromisosSugeridos(compromisos) {
-  if (!compromisos.length) {
-    $q.notify({ type: 'info', message: 'No se encontraron compromisos en el texto' });
+async function insertCompromisosSugeridos(compromisos) {
+  const today = new Date().toISOString().slice(0, 10);
+  const consecutivo = props.isEdit ? props.record?.consecutivo : null;
+  let added = 0;
+
+  let nextItemNum = editCompromisosRows.value.length
+    ? Math.max(...editCompromisosRows.value.map((r) => Number(r.item) || 0)) + 1
+    : 1;
+
+  for (const c of compromisos) {
+    const compromiso = String(c?.compromiso || '').trim();
+    if (!compromiso) continue;
+
+    const payload = {
+      lado: 'ix',
+      compromiso,
+      responsable: String(c?.responsable || '').trim() || 'Por definir',
+      fecha_inicio: today,
+      fecha_entrega: c?.fecha_entrega || null,
+    };
+
+    if (consecutivo) {
+      await compApi.create({ consecutivo, item: nextItemNum++, ...payload });
+    } else {
+      onAddCompromiso({
+        ...payload,
+        _localId: `ai-${Date.now()}-${added}-${Math.random()}`,
+      });
+    }
+    added += 1;
+  }
+
+  if (!added) {
+    $q.notify({ type: 'info', message: 'No se agregaron compromisos válidos' });
     return;
   }
 
-  const lista = compromisos.map((c, i) => `${i + 1}. ${c.compromiso}`).join('\n');
+  if (consecutivo) {
+    await loadEditCompromisos();
+    emit('compromisos-changed', consecutivo);
+  }
 
-  $q.dialog({
-    title: `${compromisos.length} compromiso(s) sugerido(s)`,
-    message: `${lista}\n\n¿Agregar todos al acta?`,
-    cancel: { label: 'Cancelar', flat: true, noCaps: true },
-    ok: { label: 'Agregar todos', color: 'primary', unelevated: true, noCaps: true },
-    persistent: true,
-  }).onOk(async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    let item = localCompromisos.value.length
-      ? Math.max(...localCompromisos.value.map((r) => Number(r.item) || 0)) + 1
-      : 1;
+  $q.notify({ type: 'positive', message: `${added} compromiso(s) agregado(s)` });
+}
 
-    for (const c of compromisos) {
-      if (!c?.compromiso) continue;
-      const row = {
-        _localId: `ai-${Date.now()}-${item}`,
-        item: item++,
-        lado: 'ix',
-        compromiso: c.compromiso,
-        responsable: c.responsable || '',
-        fecha_inicio: today,
-        fecha_entrega: c.fecha_entrega || '',
-      };
-
-      if (props.isEdit && props.record?.consecutivo) {
-        await compApi.create({ consecutivo: props.record.consecutivo, ...row });
-      } else {
-        localCompromisos.value = [...localCompromisos.value, row];
-      }
+function aplicarCompromisosSugeridos(compromisos) {
+  return new Promise((resolve) => {
+    if (!compromisos.length) {
+      $q.notify({ type: 'info', message: 'No se encontraron compromisos en el texto' });
+      resolve(false);
+      return;
     }
 
-    $q.notify({ type: 'positive', message: `${compromisos.length} compromiso(s) agregado(s)` });
+    const lista = compromisos.map((c, i) => `${i + 1}. ${c.compromiso}`).join('\n');
+
+    // Esperar cierre del diálogo de confirmación IA antes de abrir el siguiente
+    setTimeout(() => {
+      $q.dialog({
+        title: `${compromisos.length} compromiso(s) sugerido(s)`,
+        message: `${lista}\n\n¿Agregar todos al acta?`,
+        cancel: { label: 'Cancelar', flat: true, noCaps: true },
+        ok: { label: 'Agregar todos', color: 'primary', unelevated: true, noCaps: true },
+        persistent: true,
+      })
+        .onOk(async () => {
+          try {
+            await insertCompromisosSugeridos(compromisos);
+            resolve(true);
+          } catch (err) {
+            $q.notify({ type: 'negative', message: extractApiError(err, 'Error al agregar compromisos') });
+            resolve(false);
+          }
+        })
+        .onCancel(() => resolve(false));
+    }, 400);
   });
 }
 

@@ -165,6 +165,7 @@
         :record="current"
         :is-edit="isEdit"
         @saved="onSaved"
+        @compromisos-changed="onCompromisosChanged"
       />
 
       <NotifyRecipientDialog
@@ -349,6 +350,12 @@ function openEdit(row) {
 function onSaved() {
   formOpen.value = false;
   load();
+}
+
+async function onCompromisosChanged(consecutivo) {
+  if (expanded.value === consecutivo) {
+    await reloadDetail(consecutivo);
+  }
 }
 
 function confirmDelete(row) {
