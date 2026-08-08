@@ -2,6 +2,20 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.9] - 2026-08-08
+
+### Agregado
+- **Dictado por voz** e **integración OpenAI** en actas, compromisos, bitácora, cronograma, bandeja de correos, notificaciones y formularios genéricos.
+- **Vista previa editable** de compromisos extraídos por IA: responsable, fechas de inicio/entrega y lado cliente/IX antes de agregar al acta.
+
+### Corregido
+- Inserción de compromisos sugeridos por IA en actas abiertas (item duplicado y fechas inválidas).
+
+### Cambiado
+- Edición de actas en **pantalla completa**.
+- Clientes/proyectos ordenados por **código** en configuración.
+- **Documento del funcionario** editable al modificar el registro en el detalle del cliente.
+
 ## [1.2.8] - 2026-07-13
 
 ### Corregido

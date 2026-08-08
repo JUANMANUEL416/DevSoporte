@@ -225,7 +225,12 @@ export function crudRouter(entity) {
       if (entity.beforeUpdate) {
         await entity.beforeUpdate(req.body, ids);
       }
-      const cols = columns.filter((c) => !pk.includes(c) && req.body[c] !== undefined);
+      const editablePk = entity.editablePk || [];
+      const cols = columns.filter((c) => {
+        if (req.body[c] === undefined) return false;
+        if (pk.includes(c) && !editablePk.includes(c)) return false;
+        return true;
+      });
       if (!cols.length) return res.status(400).json({ error: 'Sin datos para actualizar' });
       const values = cols.map((c) => req.body[c]);
       const setClause = cols.map((c, i) => `${c} = $${i + 1}`).join(', ');

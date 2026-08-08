@@ -199,11 +199,30 @@ function beforeClienteSave(body) {
   Object.assign(body, applyClienteNotificaciones(body));
 }
 
+async function beforeFuncionarioUpdate(body, ids) {
+  const [codigo, oldDocumento] = ids;
+  const newDocumento = String(body.documento || '').trim();
+  if (!newDocumento || newDocumento === oldDocumento) return;
+
+  const dup = await query(
+    'SELECT 1 FROM clief WHERE codigo = $1 AND documento = $2',
+    [codigo, newDocumento],
+  );
+  if (dup.rows.length) {
+    const err = new Error('Ya existe un funcionario con ese documento en el cliente');
+    err.status = 409;
+    throw err;
+  }
+}
+
 // Hooks por entidad (validaciones, correo, etc.).
 const entityHooks = {
   clientes: {
     beforeCreate: beforeClienteSave,
     beforeUpdate: beforeClienteSave,
+  },
+  funcionarios: {
+    beforeUpdate: beforeFuncionarioUpdate,
   },
   capacitaciones: {
     beforeCreate: beforeCapacitacionCreate,

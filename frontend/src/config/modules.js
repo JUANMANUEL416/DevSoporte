@@ -100,7 +100,7 @@ export const modules = [
         { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
       ],
       fields: [
-        { name: 'documento', label: 'Documento', type: 'text', required: true },
+        { name: 'documento', label: 'Documento', type: 'text', required: true, editableOnEdit: true },
         { name: 'nombre', label: 'Nombre funcionario', type: 'text' },
         {
           name: 'tratamiento',

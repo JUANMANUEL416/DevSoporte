@@ -317,7 +317,8 @@ function isPk(name) {
 function isFieldDisabled(f) {
   if (f.fixed || f.disabled) return true;
   if (f.lookupRequires && !form.value[f.lookupRequires]) return true;
-  return props.isEdit && isPk(f.name);
+  if (props.isEdit && isPk(f.name) && !f.editableOnEdit) return true;
+  return false;
 }
 
 function emailRules(f) {

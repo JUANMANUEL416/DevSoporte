@@ -22,7 +22,7 @@ export const entities = {
     pk: ['codigo'],
     columns: ['codigo', 'nombrecliente', 'contrato', 'ciudad', 'prefijo', 'rutaexport', 'email', 'liderproyecto', 'noticliente'],
     search: ['codigo', 'nombrecliente', 'ciudad', 'email'],
-    orderBy: 'nombrecliente',
+    orderBy: 'codigo',
     label: 'Clientes',
     autoConsecutivo: {
       field: 'codigo',
@@ -37,6 +37,7 @@ export const entities = {
     search: ['documento', 'nombre', 'cargo', 'email'],
     orderBy: 'nombre',
     label: 'Funcionarios del Cliente',
+    editablePk: ['documento'],
     filterColumns: ['codigo', 'estado'],
     filterColumnsCaseInsensitive: ['estado'],
     excludeCapacitaParam: 'excludeCnscapacita',
