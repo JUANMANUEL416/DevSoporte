@@ -148,11 +148,17 @@
             hint="Resumen de lo implementado antes de merge a develop"
           >
             <template #append>
-              <OrganizarTextoButton
-                :texto="integrarCambios"
-                contexto="control_versiones_cambios"
-                @organizado="integrarCambios = $event"
-              />
+              <div class="row items-center no-wrap q-gutter-xs">
+                <DictadoButton
+                  :active="integrarOpen"
+                  @dictado="(t) => { integrarCambios = appendDictadoPlain(integrarCambios, t); }"
+                />
+                <OrganizarTextoButton
+                  :texto="integrarCambios"
+                  contexto="control_versiones_cambios"
+                  @organizado="integrarCambios = $event"
+                />
+              </div>
             </template>
           </q-input>
         </q-card-section>
@@ -177,12 +183,18 @@
           <q-input v-model="publicarResumen" outlined label="Resumen de la versión" />
           <q-input v-model="publicarChangelog" type="textarea" autogrow outlined label="Changelog (opcional)">
             <template #append>
-              <OrganizarTextoButton
-                :texto="publicarChangelog"
-                accion="mejorar_changelog"
-                contexto="changelog"
-                @organizado="publicarChangelog = $event"
-              />
+              <div class="row items-center no-wrap q-gutter-xs">
+                <DictadoButton
+                  :active="publicarOpen"
+                  @dictado="(t) => { publicarChangelog = appendDictadoPlain(publicarChangelog, t); }"
+                />
+                <OrganizarTextoButton
+                  :texto="publicarChangelog"
+                  accion="mejorar_changelog"
+                  contexto="changelog"
+                  @organizado="publicarChangelog = $event"
+                />
+              </div>
             </template>
           </q-input>
         </q-card-section>
@@ -202,6 +214,8 @@ import GenericForm from 'src/components/GenericForm.vue';
 import { findModule } from 'src/config/modules';
 import { controlVersionesApi, useResource } from 'src/services/api';
 import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoPlain } from 'src/composables/useDictado';
 
 const $q = useQuasar();
 const mod = findModule('control_versiones');

@@ -40,13 +40,19 @@
                 bg-color="white"
               >
                 <template v-if="f.ai !== false" #append>
-                  <OrganizarTextoButton
-                    :texto="form[f.name]"
-                    :active="open"
-                    :contexto="f.aiContext || 'generico'"
-                    :modo="f.aiModo || 'plain'"
-                    @organizado="form[f.name] = $event"
-                  />
+                  <div class="row items-center no-wrap q-gutter-xs">
+                    <DictadoButton
+                      :active="open"
+                      @dictado="(t) => onFieldDictado(f, t)"
+                    />
+                    <OrganizarTextoButton
+                      :texto="form[f.name]"
+                      :active="open"
+                      :contexto="f.aiContext || 'generico'"
+                      :modo="f.aiModo || 'plain'"
+                      @organizado="form[f.name] = $event"
+                    />
+                  </div>
                 </template>
               </q-input>
               <LookupSelect
@@ -216,6 +222,8 @@ import SignaturePad from 'components/SignaturePad.vue';
 import ImageGalleryField from 'components/ImageGalleryField.vue';
 import VipPlantillaField from 'components/VipPlantillaField.vue';
 import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoPlain, appendDictadoHtml } from 'src/composables/useDictado';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -280,6 +288,15 @@ const lookupParamsMap = computed(() => {
   }
   return map;
 });
+
+function onFieldDictado(f, text) {
+  const modo = f.aiModo || 'plain';
+  if (modo === 'html') {
+    form.value[f.name] = appendDictadoHtml(form.value[f.name], text);
+  } else {
+    form.value[f.name] = appendDictadoPlain(form.value[f.name], text);
+  }
+}
 
 function onLookupPick(f, row) {
   if (!row) return;

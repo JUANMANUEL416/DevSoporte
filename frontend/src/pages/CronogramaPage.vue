@@ -487,11 +487,17 @@
             class="q-mb-md"
           >
             <template #append>
-              <OrganizarTextoButton
-                :texto="estadoItemObservacion"
-                contexto="cronograma_observacion"
-                @organizado="estadoItemObservacion = $event"
-              />
+              <div class="row items-center no-wrap q-gutter-xs">
+                <DictadoButton
+                  :active="estadoItemOpen"
+                  @dictado="(t) => { estadoItemObservacion = appendDictadoPlain(estadoItemObservacion, t); }"
+                />
+                <OrganizarTextoButton
+                  :texto="estadoItemObservacion"
+                  contexto="cronograma_observacion"
+                  @organizado="estadoItemObservacion = $event"
+                />
+              </div>
             </template>
           </q-input>
 
@@ -563,11 +569,17 @@
             class="q-mb-md"
           >
             <template #append>
-              <OrganizarTextoButton
-                :texto="estadoItemObservacion"
-                contexto="cronograma_observacion"
-                @organizado="estadoItemObservacion = $event"
-              />
+              <div class="row items-center no-wrap q-gutter-xs">
+                <DictadoButton
+                  :active="estadoItemOpen"
+                  @dictado="(t) => { estadoItemObservacion = appendDictadoPlain(estadoItemObservacion, t); }"
+                />
+                <OrganizarTextoButton
+                  :texto="estadoItemObservacion"
+                  contexto="cronograma_observacion"
+                  @organizado="estadoItemObservacion = $event"
+                />
+              </div>
             </template>
           </q-input>
 
@@ -642,11 +654,17 @@
             label="Personal requerido para la capacitación"
           >
             <template #append>
-              <OrganizarTextoButton
-                :texto="dirigidoaText"
-                contexto="cronograma_descripcion"
-                @organizado="dirigidoaText = $event"
-              />
+              <div class="row items-center no-wrap q-gutter-xs">
+                <DictadoButton
+                  :active="dirigidoaOpen"
+                  @dictado="(t) => { dirigidoaText = appendDictadoPlain(dirigidoaText, t); }"
+                />
+                <OrganizarTextoButton
+                  :texto="dirigidoaText"
+                  contexto="cronograma_descripcion"
+                  @organizado="dirigidoaText = $event"
+                />
+              </div>
             </template>
           </q-input>
         </q-card-section>
@@ -726,6 +744,8 @@ import LookupSelect from 'components/LookupSelect.vue';
 import PDFViewerComponent from 'components/PDFViewerComponent.vue';
 import NotifyRecipientDialog from 'components/NotifyRecipientDialog.vue';
 import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoPlain } from 'src/composables/useDictado';
 
 const $q = useQuasar();
 const cronoApi = useResource('cronograma');

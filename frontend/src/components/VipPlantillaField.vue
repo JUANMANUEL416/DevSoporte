@@ -99,12 +99,15 @@
       >
         <div class="vip-plantilla-field__panel-title row items-center justify-between no-wrap">
           <span>HTML de la plantilla</span>
-          <OrganizarTextoButton
-            :texto="modelValue"
-            contexto="vip_plantilla"
-            modo="html"
-            @organizado="emit('update:modelValue', $event)"
-          />
+          <div class="row items-center no-wrap q-gutter-xs">
+            <DictadoButton @dictado="onVipDictado" />
+            <OrganizarTextoButton
+              :texto="modelValue"
+              contexto="vip_plantilla"
+              modo="html"
+              @organizado="emit('update:modelValue', $event)"
+            />
+          </div>
         </div>
         <textarea
           ref="htmlTextareaRef"
@@ -140,6 +143,15 @@
       <q-banner dense rounded class="bg-amber-1 text-amber-10 q-mb-sm">
         El editor visual puede perder tablas y estilos de Word. Prefiera subir el .docx y editar en modo HTML.
       </q-banner>
+      <div class="vip-plantilla-field__editor-toolbar row items-center justify-end q-gutter-xs q-mb-xs">
+        <DictadoButton @dictado="onVipDictado" />
+        <OrganizarTextoButton
+          :texto="modelValue"
+          contexto="vip_plantilla"
+          modo="html"
+          @organizado="emit('update:modelValue', $event)"
+        />
+      </div>
       <q-editor
         ref="editorRef"
         :model-value="modelValue"
@@ -171,6 +183,8 @@ import mammoth from 'mammoth';
 import { vipClientesApi } from 'src/services/api';
 import PDFViewerComponent from 'components/PDFViewerComponent.vue';
 import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoHtml } from 'src/composables/useDictado';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -325,6 +339,10 @@ async function onWordSelected(event) {
 function onHtmlInput(event) {
   emit('update:modelValue', event.target.value);
   saveHtmlSelection(event.target);
+}
+
+function onVipDictado(text) {
+  emit('update:modelValue', appendDictadoHtml(props.modelValue, text));
 }
 
 function saveHtmlSelection(el = htmlTextareaRef.value) {

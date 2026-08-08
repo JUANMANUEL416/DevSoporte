@@ -381,6 +381,10 @@
               <div class="bandeja-compose__body-head">
                 <span class="bandeja-compose__label">Mensaje</span>
                 <div class="row items-center q-gutter-xs">
+                  <DictadoButton
+                    :active="composeOpen"
+                    @dictado="onCuerpoDictado"
+                  />
                   <OrganizarTextoButton
                     :texto="cuerpo"
                     accion="redactar_correo"
@@ -744,6 +748,8 @@ import { useResource, correosApi, clientesApi, agendaContactosApi } from 'src/se
 import { fmtAgendaCategoria } from 'src/config/modules';
 import SignaturePad from 'components/SignaturePad.vue';
 import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoPlain } from 'src/composables/useDictado';
 import {
   PLANTILLA_CUERPO_SUGERIDA,
   formatCuerpoHtml,
@@ -1315,6 +1321,11 @@ function restaurarPlantilla() {
 function onCorreoRedactado(result) {
   if (result?.asunto) asunto.value = result.asunto;
   if (result?.cuerpo || result?.texto) cuerpo.value = result.cuerpo || result.texto;
+  nextTick(resizeCuerpoTextarea);
+}
+
+function onCuerpoDictado(text) {
+  cuerpo.value = appendDictadoPlain(cuerpo.value, text);
   nextTick(resizeCuerpoTextarea);
 }
 

@@ -273,6 +273,10 @@
             <div class="notify-dialog__section-head">
               <span class="notify-dialog__section-title">Contenido del correo</span>
               <div class="row items-center q-gutter-xs">
+                <DictadoButton
+                  :active="open"
+                  @dictado="(t) => { bodyText = appendDictadoPlain(bodyText, t); }"
+                />
                 <OrganizarTextoButton
                   :texto="bodyText"
                   contexto="notificacion_cuerpo"
@@ -497,6 +501,8 @@ import {
 import { formatNombreConTratamiento } from 'src/utils/saludo';
 import { fmtAgendaCategoria } from 'src/config/modules';
 import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoPlain } from 'src/composables/useDictado';
 
 const emit = defineEmits(['update:modelValue', 'send']);
 

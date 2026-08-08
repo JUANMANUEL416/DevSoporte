@@ -66,13 +66,16 @@
             <div class="col-12 col-md-6">
               <div class="actproy-form__editor-head">
                 <div class="actproy-form__editor-label">Actividades realizadas</div>
-                <OrganizarTextoButton
+                <div class="row items-center no-wrap q-gutter-xs">
+                  <DictadoButton :active="open" @dictado="onActividadesDictado" />
+                  <OrganizarTextoButton
                   :texto="form.actividades"
                   :active="open"
                   contexto="actproy_actividades"
                   modo="html"
-                  @organizado="form.actividades = $event"
-                />
+                    @organizado="form.actividades = $event"
+                  />
+                </div>
               </div>
               <q-editor
                 v-model="form.actividades"
@@ -85,13 +88,16 @@
             <div class="col-12 col-md-6">
               <div class="actproy-form__editor-head">
                 <div class="actproy-form__editor-label">Actividades pendientes</div>
-                <OrganizarTextoButton
+                <div class="row items-center no-wrap q-gutter-xs">
+                  <DictadoButton :active="open" @dictado="onPendientesDictado" />
+                  <OrganizarTextoButton
                   :texto="form.pendientes"
                   :active="open"
                   contexto="actproy_pendientes"
                   modo="html"
-                  @organizado="form.pendientes = $event"
-                />
+                    @organizado="form.pendientes = $event"
+                  />
+                </div>
               </div>
               <q-editor
                 v-model="form.pendientes"
@@ -128,6 +134,8 @@ import { useQuasar } from 'quasar';
 import { useResource } from 'src/services/api';
 import LookupSelect from 'components/LookupSelect.vue';
 import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import DictadoButton from 'components/DictadoButton.vue';
+import { appendDictadoHtml } from 'src/composables/useDictado';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -175,6 +183,14 @@ function emptyForm() {
     actividades: '',
     pendientes: '',
   };
+}
+
+function onActividadesDictado(text) {
+  form.value.actividades = appendDictadoHtml(form.value.actividades, text);
+}
+
+function onPendientesDictado(text) {
+  form.value.pendientes = appendDictadoHtml(form.value.pendientes, text);
 }
 
 function todayISO() {
