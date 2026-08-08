@@ -5,7 +5,7 @@ INSERT INTO devcamb (
   f_inicio, f_integracion, f_terminacion, usuario
 ) VALUES (
   'devdes017',
-  'feat',
+  'feature',
   'feature/ia-dictado-modulos',
   'Dictado por voz e IA OpenAI en modulos de texto',
   'Web Speech API para dictado y OpenAI para organizar textos en actas, compromisos, bitacora, cronograma, bandeja, notificaciones y formularios genericos.',
@@ -51,7 +51,7 @@ INSERT INTO devcamb (
   f_inicio, f_integracion, f_terminacion, usuario
 ) VALUES (
   'devdes019',
-  'feat',
+  'feature',
   'feature/clientes-orden-documento',
   'Clientes ordenados por codigo y documento editable',
   'Lista de clientes/proyectos ordenada por codigo. En funcionarios del cliente se permite editar el numero de documento al modificar el registro.',
