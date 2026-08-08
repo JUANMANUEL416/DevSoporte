@@ -384,6 +384,10 @@ async function insertCompromisosSugeridos(compromisos) {
   const consecutivo = props.isEdit ? props.record?.consecutivo : null;
   let added = 0;
 
+  if (consecutivo) {
+    await loadEditCompromisos();
+  }
+
   let nextItemNum = editCompromisosRows.value.length
     ? Math.max(...editCompromisosRows.value.map((r) => Number(r.item) || 0)) + 1
     : 1;
