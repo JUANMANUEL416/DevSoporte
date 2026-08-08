@@ -619,7 +619,16 @@
             outlined
             dense
             :rules="[(v) => !!String(v || '').trim() || 'La respuesta es obligatoria']"
-          />
+          >
+            <template #append>
+              <OrganizarTextoButton
+                :texto="cerrarRespuesta"
+                :active="cerrarOpen"
+                contexto="bitacora_respuesta"
+                @organizado="cerrarRespuesta = $event"
+              />
+            </template>
+          </q-input>
         </q-card-section>
 
         <q-card-actions align="right">
@@ -657,6 +666,7 @@ import LookupSelect from 'components/LookupSelect.vue';
 import NotifyRecipientDialog from 'components/NotifyRecipientDialog.vue';
 import ImageGalleryField from 'components/ImageGalleryField.vue';
 import PDFViewerComponent from 'components/PDFViewerComponent.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 
 const $q = useQuasar();
 const biteApi = useResource('bitacora_encabezados');

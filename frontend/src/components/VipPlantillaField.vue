@@ -97,7 +97,15 @@
         @dragleave="onHtmlDragLeave"
         @drop.prevent="onHtmlDrop"
       >
-        <div class="vip-plantilla-field__panel-title">HTML de la plantilla</div>
+        <div class="vip-plantilla-field__panel-title row items-center justify-between no-wrap">
+          <span>HTML de la plantilla</span>
+          <OrganizarTextoButton
+            :texto="modelValue"
+            contexto="vip_plantilla"
+            modo="html"
+            @organizado="emit('update:modelValue', $event)"
+          />
+        </div>
         <textarea
           ref="htmlTextareaRef"
           class="vip-plantilla-field__textarea"
@@ -162,6 +170,7 @@ import { useQuasar } from 'quasar';
 import mammoth from 'mammoth';
 import { vipClientesApi } from 'src/services/api';
 import PDFViewerComponent from 'components/PDFViewerComponent.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },

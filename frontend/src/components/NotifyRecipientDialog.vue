@@ -272,7 +272,14 @@
           <section class="notify-dialog__section">
             <div class="notify-dialog__section-head">
               <span class="notify-dialog__section-title">Contenido del correo</span>
-              <q-btn flat dense color="grey-7" label="Restaurar texto" @click="restorePreview" />
+              <div class="row items-center q-gutter-xs">
+                <OrganizarTextoButton
+                  :texto="bodyText"
+                  contexto="notificacion_cuerpo"
+                  @organizado="bodyText = $event"
+                />
+                <q-btn flat dense color="grey-7" label="Restaurar texto" @click="restorePreview" />
+              </div>
             </div>
             <q-input
               v-model="subject"
@@ -489,6 +496,7 @@ import {
 } from 'src/services/api';
 import { formatNombreConTratamiento } from 'src/utils/saludo';
 import { fmtAgendaCategoria } from 'src/config/modules';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 
 const emit = defineEmits(['update:modelValue', 'send']);
 

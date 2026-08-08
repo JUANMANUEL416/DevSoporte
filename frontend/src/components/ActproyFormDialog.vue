@@ -64,7 +64,16 @@
 
           <div class="row q-col-gutter-md">
             <div class="col-12 col-md-6">
-              <div class="actproy-form__editor-label">Actividades realizadas</div>
+              <div class="actproy-form__editor-head">
+                <div class="actproy-form__editor-label">Actividades realizadas</div>
+                <OrganizarTextoButton
+                  :texto="form.actividades"
+                  :active="open"
+                  contexto="actproy_actividades"
+                  modo="html"
+                  @organizado="form.actividades = $event"
+                />
+              </div>
               <q-editor
                 v-model="form.actividades"
                 class="actproy-form__editor"
@@ -74,7 +83,16 @@
               />
             </div>
             <div class="col-12 col-md-6">
-              <div class="actproy-form__editor-label">Actividades pendientes</div>
+              <div class="actproy-form__editor-head">
+                <div class="actproy-form__editor-label">Actividades pendientes</div>
+                <OrganizarTextoButton
+                  :texto="form.pendientes"
+                  :active="open"
+                  contexto="actproy_pendientes"
+                  modo="html"
+                  @organizado="form.pendientes = $event"
+                />
+              </div>
               <q-editor
                 v-model="form.pendientes"
                 class="actproy-form__editor"
@@ -109,6 +127,7 @@ import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { useResource } from 'src/services/api';
 import LookupSelect from 'components/LookupSelect.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -304,6 +323,14 @@ async function save() {
 .actproy-form-card__body {
   padding: 20px;
   background: #f8fafc;
+}
+
+.actproy-form__editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .actproy-form__editor-label {

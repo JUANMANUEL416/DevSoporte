@@ -380,7 +380,21 @@
             <div class="bandeja-compose__message">
               <div class="bandeja-compose__body-head">
                 <span class="bandeja-compose__label">Mensaje</span>
-                <q-btn flat dense no-caps color="grey-7" icon="restart_alt" label="Restaurar plantilla" @click="restaurarPlantilla" />
+                <div class="row items-center q-gutter-xs">
+                  <OrganizarTextoButton
+                    :texto="cuerpo"
+                    accion="redactar_correo"
+                    contexto="correo_cuerpo"
+                    :asunto="asunto"
+                    @resultado="onCorreoRedactado"
+                  />
+                  <OrganizarTextoButton
+                    :texto="cuerpo"
+                    contexto="correo_cuerpo"
+                    @organizado="cuerpo = $event"
+                  />
+                  <q-btn flat dense no-caps color="grey-7" icon="restart_alt" label="Restaurar plantilla" @click="restaurarPlantilla" />
+                </div>
               </div>
               <div class="bandeja-compose__editor-panel">
                 <div class="bandeja-compose__content-scroll">
@@ -729,6 +743,7 @@ import { useQuasar } from 'quasar';
 import { useResource, correosApi, clientesApi, agendaContactosApi } from 'src/services/api';
 import { fmtAgendaCategoria } from 'src/config/modules';
 import SignaturePad from 'components/SignaturePad.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 import {
   PLANTILLA_CUERPO_SUGERIDA,
   formatCuerpoHtml,
@@ -1294,6 +1309,12 @@ function restaurarPlantilla() {
   const tpl = buildPlantilla(clienteNombre.value);
   cuerpo.value = tpl;
   plantillaSnapshot.value = tpl;
+  nextTick(resizeCuerpoTextarea);
+}
+
+function onCorreoRedactado(result) {
+  if (result?.asunto) asunto.value = result.asunto;
+  if (result?.cuerpo || result?.texto) cuerpo.value = result.cuerpo || result.texto;
   nextTick(resizeCuerpoTextarea);
 }
 

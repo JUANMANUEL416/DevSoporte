@@ -485,7 +485,15 @@
             bg-color="white"
             autogrow
             class="q-mb-md"
-          />
+          >
+            <template #append>
+              <OrganizarTextoButton
+                :texto="estadoItemObservacion"
+                contexto="cronograma_observacion"
+                @organizado="estadoItemObservacion = $event"
+              />
+            </template>
+          </q-input>
 
           <div class="crono-estado-dialog__options">
             <q-btn
@@ -553,7 +561,15 @@
             bg-color="white"
             autogrow
             class="q-mb-md"
-          />
+          >
+            <template #append>
+              <OrganizarTextoButton
+                :texto="estadoItemObservacion"
+                contexto="cronograma_observacion"
+                @organizado="estadoItemObservacion = $event"
+              />
+            </template>
+          </q-input>
 
           <div class="crono-estado-dialog__options">
             <q-btn
@@ -624,7 +640,15 @@
             autogrow
             bg-color="white"
             label="Personal requerido para la capacitación"
-          />
+          >
+            <template #append>
+              <OrganizarTextoButton
+                :texto="dirigidoaText"
+                contexto="cronograma_descripcion"
+                @organizado="dirigidoaText = $event"
+              />
+            </template>
+          </q-input>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancelar" v-close-popup />
@@ -701,6 +725,7 @@ import GenericForm from 'components/GenericForm.vue';
 import LookupSelect from 'components/LookupSelect.vue';
 import PDFViewerComponent from 'components/PDFViewerComponent.vue';
 import NotifyRecipientDialog from 'components/NotifyRecipientDialog.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 
 const $q = useQuasar();
 const cronoApi = useResource('cronograma');

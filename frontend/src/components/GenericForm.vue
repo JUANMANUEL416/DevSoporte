@@ -38,7 +38,17 @@
                 dense
                 class="generic-form__field"
                 bg-color="white"
-              />
+              >
+                <template v-if="f.ai !== false" #append>
+                  <OrganizarTextoButton
+                    :texto="form[f.name]"
+                    :active="open"
+                    :contexto="f.aiContext || 'generico'"
+                    :modo="f.aiModo || 'plain'"
+                    @organizado="form[f.name] = $event"
+                  />
+                </template>
+              </q-input>
               <LookupSelect
                 v-else-if="f.type === 'lookup'"
                 v-model="form[f.name]"
@@ -205,6 +215,7 @@ import ContactosDialogField from 'components/ContactosDialogField.vue';
 import SignaturePad from 'components/SignaturePad.vue';
 import ImageGalleryField from 'components/ImageGalleryField.vue';
 import VipPlantillaField from 'components/VipPlantillaField.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 
 const props = defineProps({
   modelValue: Boolean,

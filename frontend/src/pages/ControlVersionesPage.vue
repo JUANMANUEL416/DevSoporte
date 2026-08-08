@@ -146,7 +146,15 @@
             outlined
             label="Cambios realizados"
             hint="Resumen de lo implementado antes de merge a develop"
-          />
+          >
+            <template #append>
+              <OrganizarTextoButton
+                :texto="integrarCambios"
+                contexto="control_versiones_cambios"
+                @organizado="integrarCambios = $event"
+              />
+            </template>
+          </q-input>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancelar" v-close-popup />
@@ -167,7 +175,16 @@
         <q-card-section class="q-gutter-md">
           <q-input v-model="publicarVersion" outlined label="Nueva versión (semver)" hint="Ej. 1.2.0" />
           <q-input v-model="publicarResumen" outlined label="Resumen de la versión" />
-          <q-input v-model="publicarChangelog" type="textarea" autogrow outlined label="Changelog (opcional)" />
+          <q-input v-model="publicarChangelog" type="textarea" autogrow outlined label="Changelog (opcional)">
+            <template #append>
+              <OrganizarTextoButton
+                :texto="publicarChangelog"
+                accion="mejorar_changelog"
+                contexto="changelog"
+                @organizado="publicarChangelog = $event"
+              />
+            </template>
+          </q-input>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancelar" v-close-popup />
@@ -184,6 +201,7 @@ import { useQuasar } from 'quasar';
 import GenericForm from 'src/components/GenericForm.vue';
 import { findModule } from 'src/config/modules';
 import { controlVersionesApi, useResource } from 'src/services/api';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 
 const $q = useQuasar();
 const mod = findModule('control_versiones');

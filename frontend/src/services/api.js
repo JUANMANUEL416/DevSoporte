@@ -243,4 +243,5 @@ export const controlVersionesApi = {
 export const aiApi = {
   status: () => api.get('/ai/status').then((r) => r.data),
   organizarTexto: (payload) => api.post('/ai/organizar-texto', payload).then((r) => r.data),
+  procesar: (payload) => api.post('/ai/procesar', payload).then((r) => r.data),
 };

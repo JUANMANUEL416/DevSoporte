@@ -239,8 +239,8 @@ export const modules = [
       },
       { name: 'rama', label: 'Rama Git (automática)', type: 'text', hideOnCreate: true, fixed: true, colSpan: 2 },
       { name: 'titulo', label: 'Título', type: 'text', required: true, colSpan: 2 },
-      { name: 'descripcion', label: 'Descripción / requerimiento', type: 'textarea', colSpan: 2 },
-      { name: 'cambios', label: 'Cambios realizados', type: 'textarea', colSpan: 2, hideOnCreate: true },
+      { name: 'descripcion', label: 'Descripción / requerimiento', type: 'textarea', colSpan: 2, aiContext: 'control_versiones_descripcion' },
+      { name: 'cambios', label: 'Cambios realizados', type: 'textarea', colSpan: 2, hideOnCreate: true, aiContext: 'control_versiones_cambios' },
       {
         name: 'estado',
         label: 'Estado',
@@ -563,7 +563,7 @@ export const modules = [
         options: ['Presencial', 'Remoto'],
       },
       { name: 'solicitud', label: 'Solicitud', type: 'textarea', colSpan: 3 },
-      { name: 'observaciones', label: 'Observaciones', type: 'textarea', colSpan: 3 },
+      { name: 'observaciones', label: 'Observaciones', type: 'textarea', colSpan: 3, aiContext: 'bitacora_observacion' },
       {
         name: 'imagenes_soporte',
         label: 'Imágenes de soporte',

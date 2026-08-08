@@ -89,13 +89,7 @@
               </div>
               <q-space />
               <DictadoButton :active="open" @dictado="onDesarrolloDictado" />
-              <OrganizarTextoButton
-                :texto="form.desarrollo"
-                :active="open"
-                contexto="desarrollo_acta"
-                modo="html"
-                @organizado="form.desarrollo = $event"
-              />
+              <AiActaAssistMenu :disabled="!form.desarrollo?.trim()" @accion="onActaAiAccion" />
             </q-card-section>
             <q-separator />
             <q-card-section>
@@ -186,12 +180,12 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import { useResource } from 'src/services/api';
+import { useResource, aiApi, extractApiError } from 'src/services/api';
 import LookupSelect from 'components/LookupSelect.vue';
 import ActaReunionCompromisosPanel from 'components/ActaReunionCompromisosPanel.vue';
 import ActaReunionAsistentesPanel from 'components/ActaReunionAsistentesPanel.vue';
 import DictadoButton from 'components/DictadoButton.vue';
-import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
+import AiActaAssistMenu from 'components/AiActaAssistMenu.vue';
 import { appendDictadoHtml } from 'src/composables/useDictado';
 
 const props = defineProps({
@@ -320,6 +314,90 @@ async function persistDetalle(consecutivo) {
 
 function onDesarrolloDictado(text) {
   form.value.desarrollo = appendDictadoHtml(form.value.desarrollo, text);
+}
+
+const ACTA_AI_LABELS = {
+  organizar: 'Organizar texto',
+  resumen_ejecutivo: 'Generar resumen ejecutivo',
+  minuta_estructurada: 'Estructurar minuta',
+  extraer_compromisos: 'Extraer compromisos',
+};
+
+async function onActaAiAccion(accion) {
+  const raw = String(form.value.desarrollo || '').trim();
+  if (!raw) {
+    $q.notify({ type: 'warning', message: 'No hay texto en motivo y desarrollo' });
+    return;
+  }
+
+  $q.dialog({
+    title: ACTA_AI_LABELS[accion] || 'Asistente IA',
+    message: 'El texto se enviará a OpenAI. ¿Desea continuar?',
+    cancel: { label: 'Cancelar', flat: true, noCaps: true },
+    ok: { label: 'Continuar', color: 'primary', unelevated: true, noCaps: true },
+    persistent: true,
+  }).onOk(async () => {
+    try {
+      const result = accion === 'organizar'
+        ? await aiApi.organizarTexto({ texto: raw, modo: 'html', contexto: 'desarrollo_acta' })
+        : await aiApi.procesar({ accion, texto: raw, modo: 'html', contexto: 'desarrollo_acta' });
+
+      if (accion === 'extraer_compromisos') {
+        await aplicarCompromisosSugeridos(result.compromisos || []);
+        return;
+      }
+
+      if (result.texto) {
+        form.value.desarrollo = result.texto;
+        $q.notify({ type: 'positive', message: 'Texto actualizado con IA' });
+      }
+    } catch (err) {
+      $q.notify({ type: 'negative', message: extractApiError(err, 'Error al procesar con IA') });
+    }
+  });
+}
+
+async function aplicarCompromisosSugeridos(compromisos) {
+  if (!compromisos.length) {
+    $q.notify({ type: 'info', message: 'No se encontraron compromisos en el texto' });
+    return;
+  }
+
+  const lista = compromisos.map((c, i) => `${i + 1}. ${c.compromiso}`).join('\n');
+
+  $q.dialog({
+    title: `${compromisos.length} compromiso(s) sugerido(s)`,
+    message: `${lista}\n\n¿Agregar todos al acta?`,
+    cancel: { label: 'Cancelar', flat: true, noCaps: true },
+    ok: { label: 'Agregar todos', color: 'primary', unelevated: true, noCaps: true },
+    persistent: true,
+  }).onOk(async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    let item = localCompromisos.value.length
+      ? Math.max(...localCompromisos.value.map((r) => Number(r.item) || 0)) + 1
+      : 1;
+
+    for (const c of compromisos) {
+      if (!c?.compromiso) continue;
+      const row = {
+        _localId: `ai-${Date.now()}-${item}`,
+        item: item++,
+        lado: 'ix',
+        compromiso: c.compromiso,
+        responsable: c.responsable || '',
+        fecha_inicio: today,
+        fecha_entrega: c.fecha_entrega || '',
+      };
+
+      if (props.isEdit && props.record?.consecutivo) {
+        await compApi.create({ consecutivo: props.record.consecutivo, ...row });
+      } else {
+        localCompromisos.value = [...localCompromisos.value, row];
+      }
+    }
+
+    $q.notify({ type: 'positive', message: `${compromisos.length} compromiso(s) agregado(s)` });
+  });
 }
 
 async function save() {
