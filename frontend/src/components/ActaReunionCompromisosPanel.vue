@@ -20,7 +20,15 @@
       <div class="col-12 col-md-5">
         <q-input v-model="form.compromiso" label="Compromiso *" dense outlined>
           <template #append>
-            <DictadoButton @dictado="onCompromisoDictado" />
+            <div class="row items-center no-wrap q-gutter-xs">
+              <DictadoButton @dictado="onCompromisoDictado" />
+              <OrganizarTextoButton
+                :texto="form.compromiso"
+                contexto="compromiso"
+                modo="plain"
+                @organizado="form.compromiso = $event"
+              />
+            </div>
           </template>
         </q-input>
       </div>
@@ -151,7 +159,16 @@
             class="q-mb-sm"
           >
             <template #append>
-              <DictadoButton :active="editOpen" @dictado="onEditCompromisoDictado" />
+              <div class="row items-center no-wrap q-gutter-xs">
+                <DictadoButton :active="editOpen" @dictado="onEditCompromisoDictado" />
+                <OrganizarTextoButton
+                  :texto="editForm.compromiso"
+                  :active="editOpen"
+                  contexto="compromiso"
+                  modo="plain"
+                  @organizado="editForm.compromiso = $event"
+                />
+              </div>
             </template>
           </q-input>
           <LookupSelect
@@ -213,6 +230,7 @@ import { findModule } from 'src/config/modules';
 import LookupSelect from 'components/LookupSelect.vue';
 import GenericForm from 'components/GenericForm.vue';
 import DictadoButton from 'components/DictadoButton.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 import { appendDictadoPlain } from 'src/composables/useDictado';
 
 const props = defineProps({

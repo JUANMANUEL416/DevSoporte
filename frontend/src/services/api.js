@@ -239,3 +239,8 @@ export const controlVersionesApi = {
     api.post(`/control-versiones/${encodeURIComponent(consecutivo)}/integrar`, payload).then((r) => r.data),
   publicar: (payload) => api.post('/control-versiones/publicar', payload).then((r) => r.data),
 };
+
+export const aiApi = {
+  status: () => api.get('/ai/status').then((r) => r.data),
+  organizarTexto: (payload) => api.post('/ai/organizar-texto', payload).then((r) => r.data),
+};

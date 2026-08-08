@@ -89,6 +89,13 @@
               </div>
               <q-space />
               <DictadoButton :active="open" @dictado="onDesarrolloDictado" />
+              <OrganizarTextoButton
+                :texto="form.desarrollo"
+                :active="open"
+                contexto="desarrollo_acta"
+                modo="html"
+                @organizado="form.desarrollo = $event"
+              />
             </q-card-section>
             <q-separator />
             <q-card-section>
@@ -184,6 +191,7 @@ import LookupSelect from 'components/LookupSelect.vue';
 import ActaReunionCompromisosPanel from 'components/ActaReunionCompromisosPanel.vue';
 import ActaReunionAsistentesPanel from 'components/ActaReunionAsistentesPanel.vue';
 import DictadoButton from 'components/DictadoButton.vue';
+import OrganizarTextoButton from 'components/OrganizarTextoButton.vue';
 import { appendDictadoHtml } from 'src/composables/useDictado';
 
 const props = defineProps({

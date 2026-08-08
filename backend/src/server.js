@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import authRoutes from './routes/auth.js';
+import aiRoutes from './routes/ai.js';
 import { requireAuth } from './middleware/auth.js';
 import { entities } from './entities.js';
 import { crudRouter } from './crudRouter.js';
@@ -307,6 +308,7 @@ app.use('/api/public/firma', publicFirmaRouter);
 app.use('/api/public/registro', publicRegistroRouter);
 
 app.use('/api/auth', authRoutes);
+app.use('/api/ai', requireAuth, aiRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/semanas', requireAuth, semanasRoutes);
 app.use('/api/correos', requireAuth, correosRoutes);
