@@ -585,7 +585,7 @@
     </q-dialog>
 
     <q-dialog v-model="cerrarOpen" persistent>
-      <q-card class="bit-cerrar-dialog bit-cerrar-dialog--wide">
+      <q-card class="bit-cerrar-dialog bit-cerrar-dialog--wide bit-cerrar-dialog--scroll">
         <q-card-section class="bit-cerrar-dialog__header">
           <div>
             <p class="bit-cerrar-dialog__eyebrow">Finalizar soporte</p>
@@ -595,15 +595,15 @@
           <q-btn flat dense round icon="close" v-close-popup />
         </q-card-section>
 
-        <q-card-section class="q-pt-none">
-          <div v-if="cerrarRow?.solicitud || cerrarRow?.observaciones" class="bit-cerrar-dialog__context q-mb-md">
-            <article v-if="cerrarRow?.solicitud" class="bit-detail-block">
+        <q-card-section class="bit-cerrar-dialog__body q-pt-none">
+          <div class="bit-cerrar-dialog__context q-mb-md">
+            <article class="bit-detail-block bit-cerrar-dialog__context-block">
               <h4 class="bit-detail-block__label">Soporte solicitado</h4>
-              <p class="bit-detail-block__text">{{ cerrarRow.solicitud }}</p>
+              <p class="bit-detail-block__text">{{ cerrarRow?.solicitud || '—' }}</p>
             </article>
-            <article v-if="cerrarRow?.observaciones" class="bit-detail-block">
+            <article class="bit-detail-block bit-cerrar-dialog__context-block">
               <h4 class="bit-detail-block__label">Observación</h4>
-              <p class="bit-detail-block__text">{{ cerrarRow.observaciones }}</p>
+              <p class="bit-detail-block__text">{{ cerrarRow?.observaciones || '—' }}</p>
             </article>
           </div>
 
@@ -622,33 +622,35 @@
             :max="cerrarSemana.fechafin"
             :rules="[(v) => !!v || 'Requerido', (v) => !v || (v >= cerrarSemana.fechaini && v <= cerrarSemana.fechafin) || 'Fuera de la semana']"
           />
+          <div class="bit-cerrar-dialog__respuesta-head">
+            <div class="bit-cerrar-dialog__respuesta-label">Respuesta</div>
+            <div class="row items-center no-wrap q-gutter-xs">
+              <DictadoButton
+                :active="cerrarOpen"
+                @dictado="(t) => { cerrarRespuesta = appendDictadoPlain(cerrarRespuesta, t); }"
+              />
+              <OrganizarTextoButton
+                :texto="cerrarRespuesta"
+                :active="cerrarOpen"
+                contexto="bitacora_respuesta"
+                @organizado="cerrarRespuesta = $event"
+              />
+            </div>
+          </div>
           <q-input
             v-model="cerrarRespuesta"
-            label="Respuesta"
             type="textarea"
-            autogrow
             outlined
             dense
+            autogrow
+            :rows="4"
+            class="bit-cerrar-dialog__respuesta"
+            placeholder="Describa la respuesta al soporte..."
             :rules="[(v) => !!String(v || '').trim() || 'La respuesta es obligatoria']"
-          >
-            <template #append>
-              <div class="row items-center no-wrap q-gutter-xs">
-                <DictadoButton
-                  :active="cerrarOpen"
-                  @dictado="(t) => { cerrarRespuesta = appendDictadoPlain(cerrarRespuesta, t); }"
-                />
-                <OrganizarTextoButton
-                  :texto="cerrarRespuesta"
-                  :active="cerrarOpen"
-                  contexto="bitacora_respuesta"
-                  @organizado="cerrarRespuesta = $event"
-                />
-              </div>
-            </template>
-          </q-input>
+          />
         </q-card-section>
 
-        <q-card-actions align="right">
+        <q-card-actions class="bit-cerrar-dialog__actions" align="right">
           <q-btn flat label="Cancelar" v-close-popup />
           <q-btn
             unelevated
@@ -2011,15 +2013,59 @@ onMounted(() => {
   max-width: 720px;
 }
 
+.bit-cerrar-dialog--scroll {
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+}
+
+.bit-cerrar-dialog__body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.bit-cerrar-dialog__actions {
+  flex-shrink: 0;
+  border-top: 1px solid #e2e8f0;
+}
+
 .bit-cerrar-dialog__context {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
+.bit-cerrar-dialog__context-block {
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.bit-cerrar-dialog__respuesta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.bit-cerrar-dialog__respuesta-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.bit-cerrar-dialog__respuesta :deep(textarea) {
+  min-height: 96px;
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
-  .bit-cerrar-dialog__context {
-    grid-template-columns: 1fr;
+  .bit-cerrar-dialog--wide {
+    min-width: 0;
+    max-width: 95vw;
   }
 }
 

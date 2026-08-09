@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.16] - 2026-08-09
+
+### Corregido
+- **Bitácora:** diálogo de finalizar soporte con scroll; solicitud y observación siempre visibles en bloques independientes; área de respuesta más amplia.
+
 ## [1.2.15] - 2026-08-09
 
 ### Agregado
