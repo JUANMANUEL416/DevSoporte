@@ -84,42 +84,74 @@ function value(doc, text, x, y, w, h, { size = 9, bold = false, align = 'left' }
   doc.text(text == null ? '' : String(text), x + 4, y + 4, { width: w - 8, height: h - 8, align });
 }
 
+function textFittingHeight(doc, text, width, maxHeight) {
+  if (!text || maxHeight <= 0) return '';
+  if (doc.heightOfString(text, { width }) <= maxHeight) return text;
+
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (doc.heightOfString(text.slice(0, mid), { width }) <= maxHeight) lo = mid;
+    else hi = mid - 1;
+  }
+
+  let cut = Math.max(1, lo);
+  if (cut < text.length) {
+    const slice = text.slice(0, cut);
+    const lastNl = slice.lastIndexOf('\n');
+    const lastSp = slice.lastIndexOf(' ');
+    const brk = Math.max(lastNl, lastSp);
+    if (brk > cut * 0.55) cut = brk + (lastNl >= lastSp && lastNl >= 0 ? 1 : 0);
+  }
+  return text.slice(0, cut);
+}
+
 function drawBorderedFlowText(doc, L, W, y, text, { pad = 8, minH = 80 } = {}) {
   const textW = W - pad * 2;
   const pageBottom = doc.page.height - doc.page.margins.bottom;
   const pageTop = doc.page.margins.top;
 
   doc.font('Helvetica').fontSize(10).fillColor('#000');
-  const fullH = doc.heightOfString(text, { width: textW }) + pad * 2;
-  const devH = Math.max(minH, fullH);
+  const fullTextH = doc.heightOfString(text, { width: textW });
+  const devH = Math.max(minH, fullTextH + pad * 2);
 
-  if (y + devH <= pageBottom) {
+  if (devH <= pageBottom - y) {
     box(doc, L, y, W, devH);
     doc.text(text, L + pad, y + pad, { width: textW });
     return y + devH + 10;
   }
 
-  const firstPageIdx = doc.bufferedPageRange().count - 1;
-  const startY = y;
-  doc.text(text, L + pad, y + pad, { width: textW });
-  const endY = doc.y + pad;
-  const lastPageIdx = doc.bufferedPageRange().count - 1;
+  let remaining = text;
+  let isFirst = true;
+  let boxY = y;
 
-  for (let i = firstPageIdx; i <= lastPageIdx; i += 1) {
-    doc.switchToPage(i);
-    const top = i === firstPageIdx ? startY : pageTop;
-    const bottom = i === lastPageIdx ? endY : pageBottom;
-    const h = bottom - top;
-    doc.save().lineWidth(1).strokeColor(BORDER);
-    doc.moveTo(L, top).lineTo(L, top + h).stroke();
-    doc.moveTo(L + W, top).lineTo(L + W, top + h).stroke();
-    if (i === firstPageIdx) doc.moveTo(L, top).lineTo(L + W, top).stroke();
-    if (i === lastPageIdx) doc.moveTo(L, bottom).lineTo(L + W, bottom).stroke();
-    doc.restore();
+  while (remaining.length > 0) {
+    if (isFirst && pageBottom - boxY - pad * 2 < 40) {
+      doc.addPage();
+      boxY = pageTop;
+      isFirst = false;
+    }
+
+    const maxTextH = (boxY === pageTop && !isFirst ? pageBottom - pageTop : pageBottom - boxY) - pad * 2;
+    const chunk = textFittingHeight(doc, remaining, textW, maxTextH);
+    const chunkText = chunk || remaining.slice(0, 1);
+    const chunkH = Math.max(isFirst ? minH : 48, doc.heightOfString(chunkText, { width: textW }) + pad * 2);
+
+    box(doc, L, boxY, W, chunkH);
+    doc.text(chunkText, L + pad, boxY + pad, { width: textW });
+    remaining = remaining.slice(chunkText.length).replace(/^\s+/, '');
+    isFirst = false;
+
+    if (remaining.length > 0) {
+      doc.addPage();
+      boxY = pageTop;
+    } else {
+      return doc.y + 10;
+    }
   }
 
-  doc.switchToPage(lastPageIdx);
-  return endY + 10;
+  return doc.y + 10;
 }
 
 function drawMotivoDesarrollo(doc, L, R, y, desarrolloHtml) {
