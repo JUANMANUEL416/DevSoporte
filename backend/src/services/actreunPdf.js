@@ -84,6 +84,30 @@ function value(doc, text, x, y, w, h, { size = 9, bold = false, align = 'left' }
   doc.text(text == null ? '' : String(text), x + 4, y + 4, { width: w - 8, height: h - 8, align });
 }
 
+function valueCell(doc, text, x, y, w, h, { size = 8, align = 'left' } = {}) {
+  box(doc, x, y, w, h);
+  doc.font('Helvetica').fontSize(size).fillColor('#000');
+  doc.text(text == null ? '' : String(text), x + 4, y + 4, { width: w - 8, align });
+}
+
+function rowHeightForValues(doc, vals, cols, { size = 8, minH = 28, pad = 8 } = {}) {
+  doc.font('Helvetica').fontSize(size);
+  let maxH = minH;
+  cols.forEach((col, i) => {
+    const text = vals[i] == null ? '' : String(vals[i]);
+    const innerH = doc.heightOfString(text, { width: col.w - 8 }) + pad;
+    maxH = Math.max(maxH, innerH);
+  });
+  return maxH;
+}
+
+function ensurePageSpace(doc, y, needed, pageTop) {
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  if (y + needed <= pageBottom) return { y, newPage: false };
+  doc.addPage();
+  return { y: pageTop, newPage: true };
+}
+
 function textFittingHeight(doc, text, width, maxHeight) {
   if (!text || maxHeight <= 0) return '';
   if (doc.heightOfString(text, { width }) <= maxHeight) return text;
@@ -213,9 +237,15 @@ function drawHeader(doc, L, R, W, row) {
 
 function drawCompromisosTable(doc, L, R, y, title, compromisos, minRows = 2) {
   const W = R - L;
-  const rowH = 28;
-  label(doc, title, L, y, W, 18, { size: 9, align: 'left' });
-  y += 18;
+  const minRowH = 28;
+  const cellSize = 8;
+  const pageTop = doc.page.margins.top;
+  const headerH = 18;
+
+  y = ensurePageSpace(doc, y, headerH * 2 + minRowH, pageTop).y;
+
+  label(doc, title, L, y, W, headerH, { size: 9, align: 'left' });
+  y += headerH;
 
   const cols = [
     { label: 'COMPROMISO', w: W * 0.48, align: 'left' },
@@ -223,18 +253,22 @@ function drawCompromisosTable(doc, L, R, y, title, compromisos, minRows = 2) {
     { label: 'FECHA INICIO', w: W * 0.11, align: 'center' },
     { label: 'FECHA ENTREGA', w: W * 0.11, align: 'center' },
   ];
-  let x = L;
-  for (const col of cols) {
-    label(doc, col.label, x, y, col.w, 18, { size: 6.5, lineBreak: false });
-    x += col.w;
-  }
-  y += 18;
+
+  const drawColumnHeaders = (atY) => {
+    let x = L;
+    for (const col of cols) {
+      label(doc, col.label, x, atY, col.w, headerH, { size: 6.5, lineBreak: false });
+      x += col.w;
+    }
+    return atY + headerH;
+  };
+
+  y = drawColumnHeaders(y);
 
   const rows = [...compromisos];
   while (rows.length < minRows) rows.push(null);
 
   for (const row of rows) {
-    x = L;
     const vals = row
       ? [
           row.compromiso || '',
@@ -243,8 +277,17 @@ function drawCompromisosTable(doc, L, R, y, title, compromisos, minRows = 2) {
           row.fecha_entrega ? fmtDate(row.fecha_entrega) : 'nd',
         ]
       : ['', '', '', ''];
+
+    const rowH = rowHeightForValues(doc, vals, cols, { size: cellSize, minH: minRowH });
+    const space = ensurePageSpace(doc, y, rowH, pageTop);
+    y = space.y;
+    if (space.newPage) {
+      y = drawColumnHeaders(y);
+    }
+
+    let x = L;
     cols.forEach((col, i) => {
-      value(doc, vals[i], x, y, col.w, rowH, { size: 8, align: col.align });
+      valueCell(doc, vals[i], x, y, col.w, rowH, { size: cellSize, align: col.align });
       x += col.w;
     });
     y += rowH;

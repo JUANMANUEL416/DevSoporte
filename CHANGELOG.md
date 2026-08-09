@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.12] - 2026-08-08
+
+### Corregido
+- **PDF del acta:** filas de compromisos con altura dinámica; el texto largo ya no se corta en la celda.
+
 ## [1.2.11] - 2026-08-08
 
 ### Corregido
