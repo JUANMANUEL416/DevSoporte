@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.13] - 2026-08-08
+
+### Corregido
+- **Informe de actividades:** diálogo maximizado con scroll en el contenido; botones Cancelar y Guardar siempre visibles abajo.
+
 ## [1.2.12] - 2026-08-08
 
 ### Corregido
