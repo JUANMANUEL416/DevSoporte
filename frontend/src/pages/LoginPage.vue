@@ -161,8 +161,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useQuasar } from 'quasar';
 import { useAuthStore } from 'src/stores/auth';
 import { authApi } from 'src/services/api';
@@ -177,7 +177,19 @@ const view = ref('login');
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 const $q = useQuasar();
+
+onMounted(() => {
+  if (route.query.expired === '1') {
+    $q.notify({
+      type: 'warning',
+      message: 'Su sesión expiró. Inicie sesión nuevamente.',
+      timeout: 5000,
+    });
+    router.replace({ path: '/login' });
+  }
+});
 
 async function onSubmit() {
   loading.value = true;

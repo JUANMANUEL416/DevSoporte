@@ -84,6 +84,57 @@ function value(doc, text, x, y, w, h, { size = 9, bold = false, align = 'left' }
   doc.text(text == null ? '' : String(text), x + 4, y + 4, { width: w - 8, height: h - 8, align });
 }
 
+function drawBorderedFlowText(doc, L, W, y, text, { pad = 8, minH = 80 } = {}) {
+  const textW = W - pad * 2;
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  const pageTop = doc.page.margins.top;
+
+  doc.font('Helvetica').fontSize(10).fillColor('#000');
+  const fullH = doc.heightOfString(text, { width: textW }) + pad * 2;
+  const devH = Math.max(minH, fullH);
+
+  if (y + devH <= pageBottom) {
+    box(doc, L, y, W, devH);
+    doc.text(text, L + pad, y + pad, { width: textW });
+    return y + devH + 10;
+  }
+
+  const firstPageIdx = doc.bufferedPageRange().count - 1;
+  const startY = y;
+  doc.text(text, L + pad, y + pad, { width: textW });
+  const endY = doc.y + pad;
+  const lastPageIdx = doc.bufferedPageRange().count - 1;
+
+  for (let i = firstPageIdx; i <= lastPageIdx; i += 1) {
+    doc.switchToPage(i);
+    const top = i === firstPageIdx ? startY : pageTop;
+    const bottom = i === lastPageIdx ? endY : pageBottom;
+    const h = bottom - top;
+    doc.save().lineWidth(1).strokeColor(BORDER);
+    doc.moveTo(L, top).lineTo(L, top + h).stroke();
+    doc.moveTo(L + W, top).lineTo(L + W, top + h).stroke();
+    if (i === firstPageIdx) doc.moveTo(L, top).lineTo(L + W, top).stroke();
+    if (i === lastPageIdx) doc.moveTo(L, bottom).lineTo(L + W, bottom).stroke();
+    doc.restore();
+  }
+
+  doc.switchToPage(lastPageIdx);
+  return endY + 10;
+}
+
+function drawMotivoDesarrollo(doc, L, R, y, desarrolloHtml) {
+  const W = R - L;
+  label(doc, 'MOTIVO DE LA REUNIÓN', L, y, W, 18, { size: 9, align: 'left' });
+  y += 18;
+  const devText = htmlToPlain(desarrolloHtml);
+  if (!devText) {
+    const devH = 80;
+    box(doc, L, y, W, devH);
+    return y + devH + 10;
+  }
+  return drawBorderedFlowText(doc, L, W, y, devText);
+}
+
 function drawHeader(doc, L, R, W, row) {
   const headTop = 36;
   const headH = 70;
@@ -338,16 +389,14 @@ export function buildActreunPdf(row) {
     doc.text(anio, L + 362, y + 6, { width: R - (L + 362), align: 'center' });
     y += rowH + 8;
 
-    // MOTIVO / desarrollo
-    label(doc, 'MOTIVO DE LA REUNIÓN', L, y, W, 18, { size: 9, align: 'left' });
-    y += 18;
-    const devText = htmlToPlain(row.desarrollo);
-    doc.font('Helvetica').fontSize(10);
-    const devH = Math.min(220, Math.max(80, doc.heightOfString(devText, { width: W - 16 }) + 20));
-    box(doc, L, y, W, devH);
-    doc.font('Helvetica').fontSize(10).fillColor('#000');
-    doc.text(devText, L + 8, y + 8, { width: W - 16, height: devH - 16 });
-    y += devH + 10;
+    // MOTIVO / desarrollo (altura dinámica, pagina adicional si hace falta)
+    y = drawMotivoDesarrollo(doc, L, R, y, row.desarrollo);
+
+    const pageBottom = doc.page.height - doc.page.margins.bottom;
+    if (y > pageBottom - 120) {
+      doc.addPage();
+      y = doc.page.margins.top;
+    }
 
     // COMPROMISOS
     label(doc, 'COMPROMISOS ADQUIRIDOS', L, y, W, 18, { size: 9, align: 'left' });

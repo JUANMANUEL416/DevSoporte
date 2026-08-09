@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.10] - 2026-08-08
+
+### Agregado
+- **Sesión renovable (sliding session):** cada petición autenticada extiende la vigencia del JWT; aviso al login si la sesión expiró.
+
+### Corregido
+- **PDF del acta:** el motivo/desarrollo ya no se corta a 220 px; muestra todo el texto con paginación automática.
+
 ## [1.2.9] - 2026-08-08
 
 ### Agregado

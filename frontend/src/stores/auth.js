@@ -25,6 +25,10 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('devsoporte_token');
       localStorage.removeItem('devsoporte_user');
     },
+    refreshToken(token) {
+      this.token = token;
+      localStorage.setItem('devsoporte_token', token);
+    },
     grantAdmin() {
       this.adminGranted = true;
     },

@@ -304,6 +304,7 @@ app.use(
         callback(null, false);
       }
     },
+    exposedHeaders: ['X-Refresh-Token'],
   }),
 );
 app.use(express.json({ limit: '12mb' }));
