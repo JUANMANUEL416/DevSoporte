@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.17] - 2026-08-09
+
+### Corregido
+- **Bitácora:** la IA al organizar la respuesta de cierre corrige y estructura el texto técnico, sin redactarlo como correo.
+
 ## [1.2.16] - 2026-08-09
 
 ### Corregido

@@ -61,7 +61,7 @@ ${modo === 'html' ? 'Responde solo con HTML simple usando etiquetas <p>.' : 'Res
   bitacora_observacion: () =>
     `Organiza observaciones de bitácora de soporte en español (Colombia). Corrige ortografía, tono profesional. No inventes datos. Solo texto plano.`,
   bitacora_respuesta: () =>
-    `Redacta respuesta de cierre de soporte en español (Colombia). Profesional, clara y concisa. No inventes datos. Solo texto plano.`,
+    `Organiza la respuesta de cierre de soporte en bitácora en español (Colombia). Corrige ortografía, mejora claridad y tono profesional técnico. Conserva el sentido del texto original. No uses formato de correo (sin saludos, despedidas, asunto ni firma). No inventes datos. Solo texto plano.`,
   cronograma_descripcion: () =>
     `Organiza descripciones de cronograma de capacitaciones en español (Colombia). Clara y profesional. Solo texto plano.`,
   cronograma_observacion: () =>
