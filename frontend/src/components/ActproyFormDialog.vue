@@ -27,7 +27,7 @@
       <q-card-section class="actproy-form-card__body">
         <q-form ref="formRef" class="actproy-form">
           <div class="row q-col-gutter-md q-mb-md">
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
               <q-input
                 v-model="form.fecha"
                 label="Fecha de soporte *"
@@ -50,7 +50,7 @@
                 @pick="onClientePick"
               />
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
               <LookupSelect
                 v-model="form.ingeniero"
                 resource="soportes"
@@ -58,6 +58,17 @@
                 label-field="nombre"
                 lookup-code-field="codigo"
                 label="Ingeniero de soporte"
+              />
+            </div>
+            <div class="col-12 col-md-2">
+              <q-input
+                v-model="form.duracion"
+                label="Duración"
+                outlined
+                dense
+                stack-label
+                bg-color="white"
+                placeholder="Ej: 8 horas"
               />
             </div>
           </div>
@@ -180,6 +191,7 @@ function emptyForm() {
     cliente: '',
     ciudad: '',
     ingeniero: '',
+    duracion: '',
     actividades: '',
     pendientes: '',
   };
@@ -228,6 +240,7 @@ watch(
       cliente: props.record.cliente ?? '',
       ciudad: props.record.ciudad ?? '',
       ingeniero: props.record.ingeniero ?? '',
+      duracion: props.record.duracion ?? '',
       actividades: props.record.actividades ?? '',
       pendientes: props.record.pendientes ?? '',
     };

@@ -62,6 +62,83 @@ function value(doc, text, x, y, w, { size = 9, bold = false, align = 'left' } = 
   doc.text(text == null ? '' : String(text), x + 4, y, { width: w - 8, align });
 }
 
+function textFittingHeight(doc, text, width, maxHeight) {
+  if (!text || maxHeight <= 0) return '';
+  if (doc.heightOfString(text, { width }) <= maxHeight) return text;
+
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (doc.heightOfString(text.slice(0, mid), { width }) <= maxHeight) lo = mid;
+    else hi = mid - 1;
+  }
+
+  let cut = Math.max(1, lo);
+  if (cut < text.length) {
+    const slice = text.slice(0, cut);
+    const lastNl = slice.lastIndexOf('\n');
+    const lastSp = slice.lastIndexOf(' ');
+    const brk = Math.max(lastNl, lastSp);
+    if (brk > cut * 0.55) cut = brk + (lastNl >= lastSp && lastNl >= 0 ? 1 : 0);
+  }
+  return text.slice(0, cut);
+}
+
+function drawBorderedFlowText(doc, L, W, y, text, { pad = 8, minH = 80 } = {}) {
+  const textW = W - pad * 2;
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  const pageTop = doc.page.margins.top;
+
+  doc.font('Helvetica').fontSize(10).fillColor('#000');
+  const fullTextH = doc.heightOfString(text, { width: textW });
+  const devH = Math.max(minH, fullTextH + pad * 2);
+
+  if (devH <= pageBottom - y) {
+    box(doc, L, y, W, devH);
+    doc.text(text, L + pad, y + pad, { width: textW });
+    return y + devH + 8;
+  }
+
+  let remaining = text;
+  let isFirst = true;
+  let boxY = y;
+
+  while (remaining.length > 0) {
+    if (isFirst && pageBottom - boxY - pad * 2 < 40) {
+      doc.addPage();
+      boxY = pageTop;
+      isFirst = false;
+    }
+
+    const maxTextH = (boxY === pageTop && !isFirst ? pageBottom - pageTop : pageBottom - boxY) - pad * 2;
+    const chunk = textFittingHeight(doc, remaining, textW, maxTextH);
+    const chunkText = chunk || remaining.slice(0, 1);
+    const chunkH = Math.max(isFirst ? minH : 48, doc.heightOfString(chunkText, { width: textW }) + pad * 2);
+
+    box(doc, L, boxY, W, chunkH);
+    doc.text(chunkText, L + pad, boxY + pad, { width: textW });
+    remaining = remaining.slice(chunkText.length).replace(/^\s+/, '');
+    isFirst = false;
+
+    if (remaining.length > 0) {
+      doc.addPage();
+      boxY = pageTop;
+    } else {
+      return boxY + chunkH + 8;
+    }
+  }
+
+  return boxY + 8;
+}
+
+function ensurePageSpace(doc, y, needed, pageTop) {
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  if (y + needed <= pageBottom) return y;
+  doc.addPage();
+  return pageTop;
+}
+
 /** Convierte HTML del editor en texto plano para el PDF. */
 function htmlToPlain(html) {
   if (!html) return '';
@@ -197,28 +274,24 @@ export function buildActproyPdf(row) {
     box(doc, L + 460, y, R - (L + 460), rowH); value(doc, row.duracion || '', L + 460, y + 7, R - (L + 460), { align: 'center' });
     y += rowH + 8;
 
+    const pageTop = doc.page.margins.top;
+
     // ---------- Actividades realizadas ----------
+    y = ensurePageSpace(doc, y, 120, pageTop);
     label(doc, 'ACTIVIDADES REALIZADAS', L, y, W, 20, { size: 10 });
     y += 20;
-    const actH = 300;
-    box(doc, L, y, W, actH);
-    doc.font('Helvetica').fontSize(10).fillColor('#000');
-    doc.text(htmlToPlain(row.actividades), L + 8, y + 8, { width: W - 16, height: actH - 16, align: 'left' });
-    y += actH + 8;
+    y = drawBorderedFlowText(doc, L, W, y, htmlToPlain(row.actividades), { minH: 120 });
 
     // ---------- Actividades pendientes ----------
+    y = ensurePageSpace(doc, y, 80, pageTop);
     label(doc, 'ACTIVIDADES PENDIENTES', L, y, W, 20, { size: 10 });
     y += 20;
-    const penH = 90;
-    box(doc, L, y, W, penH);
-    doc.font('Helvetica').fontSize(10).fillColor('#000');
-    doc.text(htmlToPlain(row.pendientes), L + 8, y + 8, { width: W - 16, height: penH - 16, align: 'left' });
-    y += penH + 14;
+    y = drawBorderedFlowText(doc, L, W, y, htmlToPlain(row.pendientes), { minH: 60 });
 
     // ---------- Firmas ----------
     const sigW = (W - 16) / 2;
     const sigH = 96;
-    const sigY = y;
+    const sigY = ensurePageSpace(doc, y + 14, sigH, pageTop);
 
     // Empresa (IX COLOMBIA SAS) = ingeniero
     box(doc, L, sigY, sigW, sigH);

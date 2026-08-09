@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.14] - 2026-08-08
+
+### Corregido
+- **Informe de actividades:** campo Duración en el formulario; PDF con cuadros de altura dinámica y paginación para mostrar todo el texto de actividades realizadas y pendientes.
+
 ## [1.2.13] - 2026-08-08
 
 ### Corregido
