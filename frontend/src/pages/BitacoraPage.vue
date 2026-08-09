@@ -585,7 +585,7 @@
     </q-dialog>
 
     <q-dialog v-model="cerrarOpen" persistent>
-      <q-card class="bit-cerrar-dialog">
+      <q-card class="bit-cerrar-dialog bit-cerrar-dialog--wide">
         <q-card-section class="bit-cerrar-dialog__header">
           <div>
             <p class="bit-cerrar-dialog__eyebrow">Finalizar soporte</p>
@@ -596,6 +596,17 @@
         </q-card-section>
 
         <q-card-section class="q-pt-none">
+          <div v-if="cerrarRow?.solicitud || cerrarRow?.observaciones" class="bit-cerrar-dialog__context q-mb-md">
+            <article v-if="cerrarRow?.solicitud" class="bit-detail-block">
+              <h4 class="bit-detail-block__label">Soporte solicitado</h4>
+              <p class="bit-detail-block__text">{{ cerrarRow.solicitud }}</p>
+            </article>
+            <article v-if="cerrarRow?.observaciones" class="bit-detail-block">
+              <h4 class="bit-detail-block__label">Observación</h4>
+              <p class="bit-detail-block__text">{{ cerrarRow.observaciones }}</p>
+            </article>
+          </div>
+
           <p v-if="cerrarSemana.fechaini && cerrarSemana.fechafin" class="bit-cerrar-dialog__hint">
             Las fechas deben estar entre {{ cerrarSemana.fechaini }} y {{ cerrarSemana.fechafin }}.
           </p>
@@ -1993,6 +2004,23 @@ onMounted(() => {
   min-width: 420px;
   max-width: 95vw;
   border-radius: 12px;
+}
+
+.bit-cerrar-dialog--wide {
+  min-width: 560px;
+  max-width: 720px;
+}
+
+.bit-cerrar-dialog__context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .bit-cerrar-dialog__context {
+    grid-template-columns: 1fr;
+  }
 }
 
 .bit-cerrar-dialog__header {

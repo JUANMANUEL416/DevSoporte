@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.15] - 2026-08-09
+
+### Agregado
+- **Bitácora:** al finalizar un soporte, el diálogo muestra el soporte solicitado y la observación antes de ingresar la respuesta.
+
 ## [1.2.14] - 2026-08-08
 
 ### Corregido
