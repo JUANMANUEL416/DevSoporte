@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
+## [1.2.11] - 2026-08-08
+
+### Corregido
+- **PDF del acta:** error 500 al ver PDF cuando el motivo/desarrollo es largo (paginación sin `switchToPage` inválido).
+
 ## [1.2.10] - 2026-08-08
 
 ### Agregado
