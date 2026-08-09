@@ -1,6 +1,6 @@
 <template>
-  <q-dialog v-model="open" persistent class="actproy-form-dialog">
-    <q-card class="actproy-form-card">
+  <q-dialog v-model="open" persistent maximized class="actproy-form-dialog">
+    <q-card class="actproy-form-card actproy-form-card--fullscreen">
       <div class="actproy-form-card__header">
         <div class="actproy-form-card__header-icon">
           <q-icon :name="isEdit ? 'edit_note' : 'add_circle'" size="22px" />
@@ -80,7 +80,7 @@
               <q-editor
                 v-model="form.actividades"
                 class="actproy-form__editor"
-                min-height="220px"
+                min-height="280px"
                 :toolbar="editorToolbar"
                 placeholder="Describa las actividades realizadas..."
               />
@@ -102,7 +102,7 @@
               <q-editor
                 v-model="form.pendientes"
                 class="actproy-form__editor"
-                min-height="220px"
+                min-height="280px"
                 :toolbar="editorToolbar"
                 placeholder="Describa las actividades pendientes..."
               />
@@ -111,9 +111,9 @@
         </q-form>
       </q-card-section>
 
-      <q-card-actions class="actproy-form-card__actions">
+      <q-card-actions class="actproy-form-card__actions actproy-form-card__actions--left">
+        <q-btn flat no-caps label="Cancelar" class="actproy-form-card__btn-cancel" v-close-popup />
         <q-space />
-        <q-btn flat label="Cancelar" class="actproy-form-card__btn-cancel" v-close-popup />
         <q-btn
           unelevated
           color="primary"
@@ -260,11 +260,22 @@ async function save() {
 
 <style scoped lang="scss">
 .actproy-form-card {
-  width: 960px;
-  max-width: 96vw;
+  width: min(1180px, 98vw);
+  max-width: 98vw;
+  max-height: 96vh;
+  display: flex;
+  flex-direction: column;
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 16px 48px rgba(15, 23, 42, 0.18);
+}
+
+.actproy-form-card--fullscreen {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100vh;
+  height: 100vh;
+  border-radius: 0;
 }
 
 .actproy-form-card__header {
@@ -274,6 +285,7 @@ async function save() {
   padding: 18px 20px;
   background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
   color: #fff;
+  flex-shrink: 0;
 }
 
 .actproy-form-card__header-icon {
@@ -314,6 +326,7 @@ async function save() {
   padding: 12px 20px;
   background: #eef2ff;
   border-bottom: 1px solid #dbeafe;
+  flex-shrink: 0;
 }
 
 .actproy-form-card__meta-item {
@@ -337,8 +350,15 @@ async function save() {
 }
 
 .actproy-form-card__body {
-  padding: 20px;
+  padding: 20px 24px;
   background: #f8fafc;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.actproy-form-card--fullscreen .actproy-form-card__body {
+  padding: 20px 28px 24px;
 }
 
 .actproy-form__editor-head {
@@ -365,7 +385,7 @@ async function save() {
 }
 
 .actproy-form__editor :deep(.q-editor__content) {
-  min-height: 220px;
+  min-height: 280px;
   font-size: 0.9rem;
   line-height: 1.55;
 }
@@ -377,6 +397,11 @@ async function save() {
   background: #fff;
   border-top: 1px solid #e2e8f0;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+.actproy-form-card__actions--left {
+  justify-content: flex-start;
 }
 
 .actproy-form-card__btn-cancel {
