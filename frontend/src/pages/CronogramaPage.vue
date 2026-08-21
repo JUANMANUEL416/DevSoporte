@@ -186,6 +186,28 @@
                     />
                     <q-btn
                       flat
+                      color="green-8"
+                      icon="download"
+                      label="Excel seguimiento"
+                      size="sm"
+                      class="crono-btn"
+                      :disable="!getItemRows(props.row.cnscrono).length"
+                      @click="downloadExcel(props.row)"
+                    />
+                    <q-btn
+                      v-if="isCronoEditable(props.row)"
+                      flat
+                      color="green-9"
+                      icon="upload"
+                      label="Subir avance"
+                      size="sm"
+                      class="crono-btn"
+                      :loading="importingExcel === props.row.cnscrono"
+                      :disable="!getItemRows(props.row.cnscrono).length"
+                      @click="triggerExcelImport(props.row)"
+                    />
+                    <q-btn
+                      flat
                       color="teal"
                       icon="forward_to_inbox"
                       label="Enviar correo"
@@ -197,9 +219,197 @@
                   </div>
                 </header>
 
+                <q-banner
+                  v-if="isFromPlan(props.row)"
+                  dense
+                  rounded
+                  class="items-expand__plan-banner bg-teal-1 text-teal-10"
+                >
+                  <template #avatar>
+                    <q-icon name="assignment" color="teal" />
+                  </template>
+                  Cronograma desde plan <strong>{{ props.row.cnplan }}</strong>
+                  <span v-if="props.row.plan_nombre"> — {{ props.row.plan_nombre }}</span>.
+                  Organizado por módulo del plan; cada tema es un área (Inventario, Financiero…). Asigne fecha y hora por área.
+                </q-banner>
+
                 <q-inner-loading :showing="isItemLoading(props.row.cnscrono)" />
 
                 <template v-if="getTemaGroups(props.row.cnscrono).length">
+                  <template v-if="isFromPlan(props.row) && hasModuloLayout(props.row.cnscrono)">
+                    <section
+                      v-for="mod in getModuloGroups(props.row.cnscrono)"
+                      :key="`${props.row.cnscrono}:mod:${mod.modulo_codigo}`"
+                      class="modulo-group"
+                    >
+                      <header class="modulo-group__header">
+                        <q-icon name="folder" size="18px" class="q-mr-sm" color="primary" />
+                        <strong>{{ mod.modulo_nombre }}</strong>
+                      </header>
+                      <section
+                        v-for="grupo in mod.temas"
+                        :key="temaGroupKey(props.row.cnscrono, grupo)"
+                        class="tema-group tema-group--nested"
+                        :class="{ 'tema-group--collapsed': !isTemaExpanded(props.row.cnscrono, grupo) }"
+                      >
+                        <header
+                          class="tema-group__header"
+                          role="button"
+                          tabindex="0"
+                          @click="toggleTemaExpand(props.row.cnscrono, grupo)"
+                          @keydown.enter.space.prevent="toggleTemaExpand(props.row.cnscrono, grupo)"
+                        >
+                          <q-btn
+                            flat
+                            dense
+                            round
+                            size="sm"
+                            :icon="isTemaExpanded(props.row.cnscrono, grupo) ? 'expand_less' : 'expand_more'"
+                            color="primary"
+                            @click.stop="toggleTemaExpand(props.row.cnscrono, grupo)"
+                          />
+                          <q-icon name="category" size="16px" class="q-mr-xs" />
+                          <div class="tema-group__main">
+                            <strong class="tema-group__title">{{ grupo.tema_nombre }}</strong>
+                            <div class="tema-group__dirigidoa">
+                              <span class="tema-group__dirigidoa-label">Dirigido a:</span>
+                              <span class="tema-group__dirigidoa-text">{{ grupo.dirigidoa || '—' }}</span>
+                              <q-btn
+                                v-if="isCronoEditable(props.row)"
+                                flat
+                                dense
+                                round
+                                size="xs"
+                                icon="edit"
+                                color="primary"
+                                @click.stop="openDirigidoaDialog(props.row.cnscrono, grupo)"
+                              >
+                                <q-tooltip>Editar dirigido a</q-tooltip>
+                              </q-btn>
+                            </div>
+                            <div class="tema-group__programacion">
+                              <template v-if="isCronoEditable(props.row)">
+                                <q-input
+                                  :model-value="toDateKey(grupo.fecha_probable)"
+                                  label="F. probable"
+                                  type="date"
+                                  dense
+                                  outlined
+                                  bg-color="white"
+                                  class="tema-group__prog-input"
+                                  clearable
+                                  :min="toDateKey(props.row.fecha_inicial) || undefined"
+                                  :max="toDateKey(props.row.fecha_final) || undefined"
+                                  :loading="isSavingGrupoProgramacion(props.row.cnscrono, grupo)"
+                                  @update:model-value="(v) => updateGrupoProgramacion(props.row, grupo, { fecha: v })"
+                                />
+                                <q-input
+                                  :model-value="String(grupo.hora_sugerida || '').slice(0, 5)"
+                                  label="Hora"
+                                  type="time"
+                                  dense
+                                  outlined
+                                  bg-color="white"
+                                  class="tema-group__prog-input"
+                                  clearable
+                                  :loading="isSavingGrupoProgramacion(props.row.cnscrono, grupo)"
+                                  @update:model-value="(v) => updateGrupoProgramacion(props.row, grupo, { hora: v })"
+                                />
+                              </template>
+                              <template v-else>
+                                <span>
+                                  F. probable:
+                                  <strong>{{ grupo.fecha_probable ? fmtDateOnly(grupo.fecha_probable) : '—' }}</strong>
+                                </span>
+                                <span>
+                                  Hora:
+                                  <strong>{{ grupo.hora_sugerida || '—' }}</strong>
+                                </span>
+                              </template>
+                            </div>
+                          </div>
+                          <div class="tema-group__actions">
+                            <q-btn
+                              v-if="isCronoEditable(props.row)"
+                              flat
+                              dense
+                              round
+                              size="sm"
+                              icon="flag"
+                              color="deep-orange"
+                              @click.stop="openEstadoTemaDialog(props.row.cnscrono, grupo)"
+                            >
+                              <q-tooltip>Cambiar estado del tema</q-tooltip>
+                            </q-btn>
+                            <span class="tema-group__count">{{ grupo.items.length }} ítem(s)</span>
+                            <q-badge
+                              color="teal"
+                              outline
+                              class="q-ml-xs"
+                              :label="`${temaPctCumplimiento(grupo.items)}% cumpl.`"
+                            />
+                          </div>
+                        </header>
+                        <q-table
+                          v-show="isTemaExpanded(props.row.cnscrono, grupo)"
+                          class="items-table"
+                          :rows="grupo.items"
+                          :columns="itemColumns"
+                          :row-key="itemRowKey"
+                          flat
+                          bordered
+                          dense
+                          hide-pagination
+                          :pagination="{ rowsPerPage: 0 }"
+                        >
+                          <template #body-cell-estado="cell">
+                            <q-td :props="cell">
+                              <q-badge
+                                :color="estadoItemColor(cell.row.estado)"
+                                :label="cell.row.estado || 'Programado'"
+                                class="crono-badge"
+                              />
+                            </q-td>
+                          </template>
+                          <template #body-cell-duracion="cell">
+                            <q-td :props="cell" class="text-right">{{ fmtDuracionItem(cell.row.duracion) }}</q-td>
+                          </template>
+                          <template #body-cell-pct_cumplimiento="cell">
+                            <q-td :props="cell" class="text-right">
+                              <span v-if="cell.row.pct_cumplimiento != null && cell.row.pct_cumplimiento !== ''">
+                                {{ cell.row.pct_cumplimiento }}%
+                              </span>
+                              <span v-else class="text-grey-6">—</span>
+                            </q-td>
+                          </template>
+                          <template #body-cell-acciones="cell">
+                            <q-td :props="cell" class="items-table__actions-cell">
+                              <div
+                                v-if="isCronoEditable(props.row) && isItemEditable(cell.row)"
+                                class="crono-actions crono-actions--row"
+                              >
+                                <q-btn flat dense round icon="flag" color="deep-orange" @click="openEstadoItemDialog(cell.row)">
+                                  <q-tooltip>Cambiar estado</q-tooltip>
+                                </q-btn>
+                                <q-btn flat dense round icon="edit" color="primary" @click="openItemEdit(cell.row)">
+                                  <q-tooltip>Editar ítem</q-tooltip>
+                                </q-btn>
+                                <q-btn flat dense round icon="delete" color="negative" @click="confirmItemDelete(cell.row)">
+                                  <q-tooltip>Eliminar</q-tooltip>
+                                </q-btn>
+                              </div>
+                              <span v-else-if="isItemCumplido(cell.row)" class="text-positive text-caption">
+                                Cumplido
+                                <q-tooltip>Ítem realizado: no admite cambios</q-tooltip>
+                              </span>
+                              <span v-else class="text-grey-6 text-caption">—</span>
+                            </q-td>
+                          </template>
+                        </q-table>
+                      </section>
+                    </section>
+                  </template>
+                  <template v-else>
                   <section
                     v-for="grupo in getTemaGroups(props.row.cnscrono)"
                     :key="temaGroupKey(props.row.cnscrono, grupo)"
@@ -242,26 +452,56 @@
                           </q-btn>
                         </div>
                         <div class="tema-group__programacion">
-                          <span>
-                            F. probable:
-                            <strong>{{ grupo.fecha_probable ? fmtDateOnly(grupo.fecha_probable) : '—' }}</strong>
-                          </span>
-                          <span>
-                            Hora:
-                            <strong>{{ grupo.hora_sugerida || '—' }}</strong>
-                          </span>
-                          <q-btn
-                            v-if="isCronoEditable(props.row)"
-                            flat
-                            dense
-                            round
-                            size="xs"
-                            icon="edit_calendar"
-                            color="primary"
-                            @click.stop="openProgramacionDialog(props.row.cnscrono, grupo)"
-                          >
-                            <q-tooltip>Cambiar fecha y hora de asignación</q-tooltip>
-                          </q-btn>
+                          <template v-if="isFromPlan(props.row) && isCronoEditable(props.row)">
+                            <q-input
+                              :model-value="toDateKey(grupo.fecha_probable)"
+                              label="F. probable"
+                              type="date"
+                              dense
+                              outlined
+                              bg-color="white"
+                              class="tema-group__prog-input"
+                              clearable
+                              :min="toDateKey(props.row.fecha_inicial) || undefined"
+                              :max="toDateKey(props.row.fecha_final) || undefined"
+                              :loading="isSavingGrupoProgramacion(props.row.cnscrono, grupo)"
+                              @update:model-value="(v) => updateGrupoProgramacion(props.row, grupo, { fecha: v })"
+                            />
+                            <q-input
+                              :model-value="String(grupo.hora_sugerida || '').slice(0, 5)"
+                              label="Hora"
+                              type="time"
+                              dense
+                              outlined
+                              bg-color="white"
+                              class="tema-group__prog-input"
+                              clearable
+                              :loading="isSavingGrupoProgramacion(props.row.cnscrono, grupo)"
+                              @update:model-value="(v) => updateGrupoProgramacion(props.row, grupo, { hora: v })"
+                            />
+                          </template>
+                          <template v-else>
+                            <span>
+                              F. probable:
+                              <strong>{{ grupo.fecha_probable ? fmtDateOnly(grupo.fecha_probable) : '—' }}</strong>
+                            </span>
+                            <span>
+                              Hora:
+                              <strong>{{ grupo.hora_sugerida || '—' }}</strong>
+                            </span>
+                            <q-btn
+                              v-if="isCronoEditable(props.row)"
+                              flat
+                              dense
+                              round
+                              size="xs"
+                              icon="edit_calendar"
+                              color="primary"
+                              @click.stop="openProgramacionDialog(props.row.cnscrono, grupo)"
+                            >
+                              <q-tooltip>Cambiar fecha y hora de asignación</q-tooltip>
+                            </q-btn>
+                          </template>
                         </div>
                       </div>
                       <div class="tema-group__actions">
@@ -278,6 +518,12 @@
                           <q-tooltip>Cambiar estado del tema</q-tooltip>
                         </q-btn>
                         <span class="tema-group__count">{{ grupo.items.length }} ítem(s)</span>
+                        <q-badge
+                          color="teal"
+                          outline
+                          class="q-ml-xs"
+                          :label="`${temaPctCumplimiento(grupo.items)}% cumpl.`"
+                        />
                       </div>
                     </header>
                     <q-table
@@ -299,6 +545,17 @@
                             :label="cell.row.estado || 'Programado'"
                             class="crono-badge"
                           />
+                        </q-td>
+                      </template>
+                      <template #body-cell-duracion="cell">
+                        <q-td :props="cell" class="text-right">{{ fmtDuracionItem(cell.row.duracion) }}</q-td>
+                      </template>
+                      <template #body-cell-pct_cumplimiento="cell">
+                        <q-td :props="cell" class="text-right">
+                          <span v-if="cell.row.pct_cumplimiento != null && cell.row.pct_cumplimiento !== ''">
+                            {{ cell.row.pct_cumplimiento }}%
+                          </span>
+                          <span v-else class="text-grey-6">—</span>
                         </q-td>
                       </template>
                       <template #body-cell-acciones="cell">
@@ -350,6 +607,7 @@
                       </template>
                     </q-table>
                   </section>
+                  </template>
                 </template>
 
                 <div v-else-if="!isItemLoading(props.row.cnscrono)" class="items-expand__empty">
@@ -386,6 +644,14 @@
       :document="pdfDocument"
       :document-name="pdfDocumentName"
       @close="pdfDocument = null"
+    />
+
+    <input
+      ref="excelFileInput"
+      type="file"
+      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      class="crono-excel-input"
+      @change="onExcelFileSelected"
     />
 
     <q-dialog v-model="agregarTemaOpen" persistent>
@@ -803,6 +1069,9 @@ const agregarTemaFecha = ref('');
 const agregarTemaHora = ref('');
 const agregandoTema = ref(false);
 const duplicando = ref(false);
+const importingExcel = ref(null);
+const excelImportRow = ref(null);
+const excelFileInput = ref(null);
 
 const estadoItemOpen = ref(false);
 const estadoDialogMode = ref('item');
@@ -836,6 +1105,15 @@ const programacionHora = ref('');
 const programacionFechaMin = ref('');
 const programacionFechaMax = ref('');
 const savingProgramacion = ref(false);
+const savingGrupoProgramacion = ref({});
+
+function isFromPlan(row) {
+  return Boolean(row?.cnplan);
+}
+
+function isSavingGrupoProgramacion(cnscrono, grupo) {
+  return !!savingGrupoProgramacion.value[temaGroupKey(cnscrono, grupo)];
+}
 
 const currentItemRows = computed(() =>
   expandedCnscrono.value ? getItemRows(expandedCnscrono.value) : [],
@@ -933,6 +1211,25 @@ function isItemEditable(row) {
   return !isItemCumplido(row);
 }
 
+function fmtDuracionItem(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  return String(n);
+}
+
+function temaPctCumplimiento(items) {
+  const rows = items || [];
+  const withPct = rows.filter(
+    (i) => i.pct_cumplimiento !== null && i.pct_cumplimiento !== undefined && i.pct_cumplimiento !== '',
+  );
+  if (withPct.length) {
+    const sum = withPct.reduce((s, i) => s + Number(i.pct_cumplimiento), 0);
+    return Math.round(sum / withPct.length);
+  }
+  if (!rows.length) return 0;
+  return Math.round((rows.filter(isItemCumplido).length / rows.length) * 100);
+}
+
 function estadoCronoColor(estado) {
   const map = { Borrador: 'grey-6', Programado: 'primary', Cerrado: 'positive' };
   return map[estado] || 'grey';
@@ -982,6 +1279,54 @@ function toggleTemaExpand(cnscrono, grupo) {
     ...expandedTemas.value,
     [key]: !isTemaExpanded(cnscrono, grupo),
   };
+}
+
+function hasModuloLayout(cnscrono) {
+  return getItemRows(cnscrono).some((r) => r.modulo_codigo);
+}
+
+function buildTemaGroupFromRows(rows) {
+  const sorted = [...rows].sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0));
+  return {
+    tema_codigo: sorted[0]?.tema_codigo,
+    tema_nombre: sorted[0]?.tema_nombre || 'Sin tema',
+    dirigidoa: sorted[0]?.dirigidoa || '',
+    fecha_probable: sorted.find((i) => i.fecha_probable)?.fecha_probable || '',
+    hora_sugerida: sorted.find((i) => i.hora_sugerida)?.hora_sugerida || '',
+    items: sorted,
+  };
+}
+
+function getModuloGroups(cnscrono) {
+  const modMap = new Map();
+  for (const row of getItemRows(cnscrono)) {
+    const mk = row.modulo_codigo || '_';
+    if (!modMap.has(mk)) {
+      modMap.set(mk, {
+        modulo_codigo: mk,
+        modulo_nombre: row.modulo_nombre || 'Sin módulo',
+        modulo_orden: row.modulo_orden ?? 999,
+        temasMap: new Map(),
+      });
+    }
+    const mod = modMap.get(mk);
+    const tk = row.tema_codigo || row.tema_nombre || '_';
+    if (!mod.temasMap.has(tk)) mod.temasMap.set(tk, []);
+    mod.temasMap.get(tk).push(row);
+  }
+  return [...modMap.values()]
+    .sort((a, b) => (a.modulo_orden ?? 999) - (b.modulo_orden ?? 999))
+    .map((m) => ({
+      modulo_codigo: m.modulo_codigo,
+      modulo_nombre: m.modulo_nombre,
+      temas: [...m.temasMap.values()]
+        .map((items) => buildTemaGroupFromRows(items))
+        .sort((a, b) => {
+          const diff = temaFechaProbableSortKey(a.items) - temaFechaProbableSortKey(b.items);
+          if (diff !== 0) return diff;
+          return (a.tema_nombre || '').localeCompare(b.tema_nombre || '', 'es');
+        }),
+    }));
 }
 
 function groupByTema(rows) {
@@ -1278,6 +1623,47 @@ async function saveProgramacion() {
   }
 }
 
+async function updateGrupoProgramacion(cronoRow, grupo, { fecha, hora } = {}) {
+  const cnscrono = cronoRow.cnscrono;
+  const refItem = (grupo.items || []).find((i) => isItemEditable(i)) || grupo.items?.[0];
+  if (!refItem) {
+    $q.notify({ type: 'warning', message: 'No hay ítems editables en este agrupador' });
+    return;
+  }
+  const nextFecha = fecha !== undefined ? (fecha || null) : (toDateKey(grupo.fecha_probable) || null);
+  const nextHora = hora !== undefined
+    ? (String(hora || '').trim() || null)
+    : (String(grupo.hora_sugerida || '').trim() || null);
+  const min = toDateKey(cronoRow.fecha_inicial);
+  const max = toDateKey(cronoRow.fecha_final);
+  if (nextFecha && min && max && (nextFecha < min || nextFecha > max)) {
+    $q.notify({
+      type: 'warning',
+      message: `La fecha probable debe estar entre ${min} y ${max}`,
+    });
+    return;
+  }
+  const key = temaGroupKey(cnscrono, grupo);
+  savingGrupoProgramacion.value = { ...savingGrupoProgramacion.value, [key]: true };
+  try {
+    await itemApi.update(itemRowKey(refItem), {
+      ...refItem,
+      fecha_probable: nextFecha,
+      hora_sugerida: nextHora,
+    });
+    await loadItems(cnscrono, true);
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'No se pudo guardar fecha y hora',
+    });
+  } finally {
+    const next = { ...savingGrupoProgramacion.value };
+    delete next[key];
+    savingGrupoProgramacion.value = next;
+  }
+}
+
 function confirmItemDelete(row) {
   if (!isItemEditable(row)) {
     $q.notify({ type: 'warning', message: 'El ítem ya está cumplido; no se puede eliminar' });
@@ -1418,6 +1804,52 @@ async function printPdf(row, tipo) {
       type: 'negative',
       message: err.message || err.response?.data?.error || 'Error al generar el PDF',
     });
+  }
+}
+
+async function downloadExcel(row) {
+  try {
+    const res = await cronogramaApi.excel(row.cnscrono);
+    const blob = new Blob([res.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CRONOGRAMA_SEGUIMIENTO_${row.cnscrono}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    $q.notify({ type: 'negative', message: extractApiError(err) });
+  }
+}
+
+function triggerExcelImport(row) {
+  excelImportRow.value = row;
+  excelFileInput.value?.click();
+}
+
+async function onExcelFileSelected(ev) {
+  const file = ev.target.files?.[0];
+  ev.target.value = '';
+  const row = excelImportRow.value;
+  if (!file || !row) return;
+  importingExcel.value = row.cnscrono;
+  try {
+    const result = await cronogramaApi.importExcel(row.cnscrono, file);
+    await loadItems(row.cnscrono, true);
+    const warn = result.errores?.length ? ` (${result.errores.length} aviso(s))` : '';
+    $q.notify({
+      type: 'positive',
+      message: `Avance importado: ${result.updated} ítem(s)${result.omitidos ? `, ${result.omitidos} cumplidos omitidos` : ''}${warn}`,
+    });
+  } catch (err) {
+    $q.notify({ type: 'negative', message: extractApiError(err) });
+  } finally {
+    importingExcel.value = null;
+    excelImportRow.value = null;
   }
 }
 
@@ -1770,10 +2202,36 @@ onMounted(() => {
 .tema-group__programacion {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 16px;
+  align-items: center;
+  gap: 8px 12px;
   margin-top: 4px;
-  font-size: 0.75rem;
-  color: #37474f;
+  font-size: 0.78rem;
+}
+.tema-group__prog-input {
+  width: 150px;
+  min-width: 130px;
+}
+.items-expand__plan-banner {
+  margin-bottom: 10px;
+}
+.modulo-group {
+  margin-bottom: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafafa;
+}
+.modulo-group__header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #e8eaf6 0%, #ede7f6 100%);
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+}
+.tema-group--nested {
+  margin: 8px;
+  border-radius: 6px;
 }
 
 .tema-group__title {
@@ -1794,6 +2252,10 @@ onMounted(() => {
   gap: 4px;
   margin-left: auto;
   flex-shrink: 0;
+}
+
+.crono-excel-input {
+  display: none;
 }
 
 .tema-group__count {

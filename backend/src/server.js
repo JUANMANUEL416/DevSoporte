@@ -43,6 +43,20 @@ import {
 } from './routes/cronogramaCapacitacion.js';
 import { cronogramaPdfHandler } from './routes/cronogramaPdf.js';
 import {
+  cronogramaExcelDownloadHandler,
+  cronogramaExcelImportHandler,
+} from './routes/cronogramaExcel.js';
+import {
+  planTrabajoExcelDownloadHandler,
+  planTrabajoExcelImportHandler,
+} from './routes/planTrabajoExcel.js';
+import multer from 'multer';
+import {
+  enviarPlanTrabajoHandler,
+  planTrabajoPdfHandler,
+  previewPlanTrabajoHandler,
+} from './routes/planTrabajoPdf.js';
+import {
   beforeCronogramaCreate,
   beforeCronogramaItemCreate,
   beforeCronogramaItemUpdate,
@@ -50,6 +64,25 @@ import {
   beforeCronogramaUpdate,
   beforeTemaItemCreate,
 } from './services/cronogramaHooks.js';
+import {
+  beforePlanTrabajoCreate,
+  beforePlanTrabajoItemCreate,
+  beforePlanTrabajoItemDelete,
+  beforePlanTrabajoItemUpdate,
+  beforePlanTrabajoUpdate,
+} from './services/planTrabajoHooks.js';
+import {
+  agregarGrupoHandler,
+  agregarProcesosHandler,
+  generarCronogramaHandler,
+  sincronizarCronogramaHandler,
+  importTemaGrupoHandler,
+  procesosGrupoHandler,
+  reorganizarModuloHandler,
+  reorganizarAgrupadorHandler,
+  reordenarHandler,
+  moverAgrupadorHandler,
+} from './routes/planTrabajo.js';
 import destinatariosHandler from './routes/clienteNotificaciones.js';
 import clienteEquipoRoutes from './routes/clienteEquipo.js';
 import { cambiarEstadoHandler, estadoOpcionesHandler } from './routes/capacitacionEstado.js';
@@ -284,11 +317,30 @@ const entityHooks = {
     beforeUpdate: beforeCronogramaItemUpdate,
     beforeDelete: beforeCronogramaItemDelete,
   },
+  plan_trabajo: {
+    beforeCreate: beforePlanTrabajoCreate,
+    beforeUpdate: beforePlanTrabajoUpdate,
+  },
+  plan_trabajo_items: {
+    beforeCreate: beforePlanTrabajoItemCreate,
+    beforeUpdate: beforePlanTrabajoItemUpdate,
+    beforeDelete: beforePlanTrabajoItemDelete,
+  },
 };
 
 // DevSoporte API
 assertPruebasIsolation();
 const app = express();
+
+const cronogramaExcelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+const planTrabajoExcelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 const corsOrigins = (process.env.CORS_ORIGIN || '*')
   .split(',')
@@ -362,6 +414,7 @@ app.post('/api/capacitaciones/:id/cambiar-estado', requireAuth, cambiarEstadoHan
 app.get('/api/capacitaciones/:id/preview-notificacion', requireAuth, previewCapacitacionHandler);
 app.get('/api/bitacora/:id/preview-notificacion', requireAuth, previewBitacoraHandler);
 app.get('/api/cronograma/:id/preview-notificacion', requireAuth, previewCronogramaHandler);
+app.get('/api/plan_trabajo/:id/preview-notificacion', requireAuth, previewPlanTrabajoHandler);
 app.get('/api/cronograma/cliente/:cliente/cronogramas-acta', requireAuth, cronogramasClienteActaHandler);
 app.get('/api/cronograma/:id/temas-acta', requireAuth, temasActaHandler);
 app.get('/api/cronograma/:id/tema/:temaCodigo/prefill-acta', requireAuth, prefillActaHandler);
@@ -370,6 +423,32 @@ app.post('/api/cronograma/:id/duplicar', requireAuth, duplicarHandler);
 app.post('/api/cronograma/:id/tema/cambiar-estado', requireAuth, cambiarEstadoTemaHandler);
 app.post('/api/cronograma/:id/items/:item/cambiar-estado', requireAuth, cambiarEstadoItemHandler);
 app.get('/api/cronograma/:id/pdf', requireAuth, cronogramaPdfHandler);
+app.get('/api/cronograma/:id/excel', requireAuth, cronogramaExcelDownloadHandler);
+app.post(
+  '/api/cronograma/:id/import-excel',
+  requireAuth,
+  cronogramaExcelUpload.single('file'),
+  cronogramaExcelImportHandler,
+);
+app.get('/api/plan_trabajo/:id/pdf', requireAuth, planTrabajoPdfHandler);
+app.get('/api/plan_trabajo/:id/excel', requireAuth, planTrabajoExcelDownloadHandler);
+app.post(
+  '/api/plan_trabajo/:id/import-excel',
+  requireAuth,
+  planTrabajoExcelUpload.single('file'),
+  planTrabajoExcelImportHandler,
+);
+app.get('/api/qrystalos_grupos/:id/procesos', requireAuth, procesosGrupoHandler);
+app.post('/api/plan_trabajo/:id/agregar-procesos', requireAuth, agregarProcesosHandler);
+app.post('/api/plan_trabajo/:id/agregar-grupo', requireAuth, agregarGrupoHandler);
+app.post('/api/plan_trabajo/:id/reordenar', requireAuth, reordenarHandler);
+app.post('/api/plan_trabajo/:id/mover-agrupador', requireAuth, moverAgrupadorHandler);
+app.post('/api/plan_trabajo/:id/reorganizar-modulo', requireAuth, reorganizarModuloHandler);
+app.post('/api/plan_trabajo/:id/reorganizar-agrupador', requireAuth, reorganizarAgrupadorHandler);
+app.post('/api/plan_trabajo/:id/generar-cronograma', requireAuth, generarCronogramaHandler);
+app.post('/api/plan_trabajo/:id/sincronizar-cronograma', requireAuth, sincronizarCronogramaHandler);
+app.post('/api/plan_trabajo/:id/enviar-notificacion', requireAuth, enviarPlanTrabajoHandler);
+app.post('/api/temas_capacitacion/desde-agrupador', requireAuth, importTemaGrupoHandler);
 app.post('/api/cronograma/:id/enviar-notificacion', requireAuth, async (req, res, next) => {
   try {
     const result = await enviarNotificacionCronograma(req.params.id, req.body, req.user?.usuario);

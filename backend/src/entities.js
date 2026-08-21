@@ -275,10 +275,29 @@ export const entities = {
   },
   temas_capacitacion: {
     table: 'captema',
+    tableAlias: 'c',
     pk: ['codigo'],
-    columns: ['codigo', 'nombre', 'estado', 'observacion', 'dirigidoa'],
+    columns: ['codigo', 'nombre', 'estado', 'observacion', 'dirigidoa', 'qrys_grupo', 'cnplan', 'modulo_codigo', 'modulo_nombre', 'modulo_orden'],
     search: ['codigo', 'nombre'],
-    orderBy: 'codigo',
+    listSearch: ['c.codigo', 'c.nombre', 'g.nombre', 'c.qrys_grupo', 'c.modulo_nombre', 'c.cnplan'],
+    orderBy: 'c.codigo',
+    listFrom: `captema c
+      LEFT JOIN qrysgrupo g ON g.codigo = c.qrys_grupo
+      LEFT JOIN LATERAL (
+        SELECT p.modulo, m.nombre AS modulo_nombre, m.orden AS modulo_orden
+        FROM qrysgrupod gd
+        JOIN qrysproc p ON p.codigo = gd.proceso
+        LEFT JOIN qrysmod m ON m.codigo = p.modulo
+        WHERE gd.grupo = c.qrys_grupo AND c.modulo_codigo IS NULL
+        ORDER BY m.orden NULLS LAST, p.codigo
+        LIMIT 1
+      ) mod ON TRUE`,
+    listSelect: `c.codigo, c.nombre, c.estado, c.observacion, c.dirigidoa, c.qrys_grupo, c.cnplan,
+      g.nombre AS grupo_nombre,
+      COALESCE(c.modulo_codigo, mod.modulo) AS modulo_codigo,
+      COALESCE(c.modulo_nombre, mod.modulo_nombre) AS modulo_nombre,
+      COALESCE(c.modulo_orden, mod.modulo_orden) AS modulo_orden,
+      (SELECT COUNT(*)::int FROM captemad d WHERE d.codigo = c.codigo AND COALESCE(d.estado, 'A') = 'A') AS items_count`,
     label: 'Temas de Capacitación',
     autoConsecutivo: {
       field: 'codigo',
@@ -309,8 +328,8 @@ export const entities = {
       pad: 8,
     },
     filterColumns: ['cliente', 'estado'],
-    listFrom: 'cronocap c LEFT JOIN clie cl ON cl.codigo = c.cliente',
-    listSelect: 'c.cnscrono, c.cliente, c.fecha, c.fecha_inicial, c.fecha_final, c.descripcion, c.estado, c.observacion, c.usuario, cl.nombrecliente',
+    listFrom: 'cronocap c LEFT JOIN clie cl ON cl.codigo = c.cliente LEFT JOIN plantrab p ON p.cnscrono = c.cnscrono',
+    listSelect: 'c.cnscrono, c.cliente, c.fecha, c.fecha_inicial, c.fecha_final, c.descripcion, c.estado, c.observacion, c.usuario, cl.nombrecliente, p.cnplan, p.nombre AS plan_nombre',
     listSearch: ['c.cnscrono', 'c.descripcion', 'c.cliente', 'cl.nombrecliente'],
     listDateFilters: {
       fechaini: { column: 'c.fecha_inicial', op: 'column_gte' },
@@ -323,12 +342,118 @@ export const entities = {
     pk: ['cnscrono', 'item'],
     columns: [
       'cnscrono', 'item', 'tema_codigo', 'tema_nombre', 'descripcion', 'duracion', 'dirigidoa',
-      'fecha_probable', 'hora_sugerida', 'estado', 'fecha_real', 'observacion',
+      'fecha_probable', 'hora_sugerida', 'estado', 'fecha_real', 'observacion', 'pct_cumplimiento',
+      'modulo_codigo', 'modulo_nombre', 'modulo_orden',
     ],
     search: ['tema_nombre', 'descripcion', 'dirigidoa'],
     orderBy: 'item',
     label: 'Ítems Cronograma',
     filterColumns: ['cnscrono', 'estado', 'tema_codigo'],
+  },
+  qrystalos_modulos: {
+    table: 'qrysmod',
+    pk: ['codigo'],
+    columns: ['codigo', 'nombre', 'orden', 'estado'],
+    search: ['codigo', 'nombre'],
+    orderBy: 'orden ASC, codigo ASC',
+    label: 'Módulos Qrystalos',
+    filterColumns: ['estado'],
+  },
+  qrystalos_procesos: {
+    table: 'qrysproc',
+    pk: ['codigo'],
+    columns: [
+      'codigo', 'modulo', 'tipo', 'nombre', 'codigo_num', 'descripcion', 'duracion_sugerida', 'estado',
+    ],
+    search: ['codigo', 'nombre', 'codigo_num', 'descripcion'],
+    orderBy: 'codigo_num ASC, codigo ASC',
+    label: 'Procesos Qrystalos',
+    filterColumns: ['modulo', 'estado', 'tipo'],
+    listFrom: 'qrysproc p LEFT JOIN qrysmod m ON m.codigo = p.modulo',
+    listSelect: 'p.*, m.nombre AS modulo_nombre',
+    listSearch: ['p.codigo', 'p.nombre', 'p.codigo_num', 'p.descripcion', 'm.nombre'],
+    tableAlias: 'p',
+  },
+  qrystalos_grupos: {
+    table: 'qrysgrupo',
+    pk: ['codigo'],
+    columns: ['codigo', 'nombre', 'descripcion', 'estado'],
+    search: ['codigo', 'nombre', 'descripcion'],
+    orderBy: 'nombre ASC',
+    label: 'Agrupadores Qrystalos',
+    autoConsecutivo: {
+      field: 'codigo',
+      acnsPrefijo: 'QRYSGRUP',
+      pad: 4,
+      leadingPrefix: 'GRP',
+    },
+    filterColumns: ['estado'],
+  },
+  qrystalos_grupo_items: {
+    table: 'qrysgrupod',
+    pk: ['grupo', 'proceso'],
+    columns: ['grupo', 'proceso'],
+    search: ['grupo', 'proceso'],
+    orderBy: 'grupo, proceso',
+    label: 'Ítems de Agrupador',
+    filterColumns: ['grupo'],
+    listFrom: 'qrysgrupod g LEFT JOIN qrysproc p ON p.codigo = g.proceso LEFT JOIN qrysmod m ON m.codigo = p.modulo',
+    listSelect: 'g.grupo, g.proceso, p.nombre AS proceso_nombre, p.modulo, m.nombre AS modulo_nombre, p.descripcion',
+    listSearch: ['g.grupo', 'g.proceso', 'p.nombre', 'm.nombre'],
+    tableAlias: 'g',
+  },
+  plan_trabajo: {
+    table: 'plantrab',
+    pk: ['cnplan'],
+    columns: [
+      'cnplan', 'cliente', 'nombre', 'fecha', 'fecha_inicial', 'fecha_final',
+      'descripcion', 'estado', 'observacion', 'usuario', 'cnscrono',
+    ],
+    search: ['cnplan', 'nombre', 'descripcion', 'cliente'],
+    orderBy: 'cnplan ASC',
+    label: 'Plan de Trabajo',
+    autoConsecutivo: {
+      field: 'cnplan',
+      acnsPrefijo: 'PLANTRAB',
+      pad: 8,
+    },
+    filterColumns: ['cliente', 'estado'],
+    listFrom: 'plantrab p LEFT JOIN clie cl ON cl.codigo = p.cliente',
+    listSelect: 'p.cnplan, p.cliente, p.nombre, p.fecha, p.fecha_inicial, p.fecha_final, p.descripcion, p.estado, p.observacion, p.usuario, p.cnscrono, cl.nombrecliente',
+    listSearch: ['p.cnplan', 'p.nombre', 'p.descripcion', 'p.cliente', 'cl.nombrecliente'],
+    listDateFilters: {
+      fechaini: { column: 'p.fecha_inicial', op: 'column_gte' },
+      fechafin: { column: 'p.fecha_inicial', op: 'column_lte' },
+    },
+    tableAlias: 'p',
+  },
+  plan_trabajo_items: {
+    table: 'plantrabd',
+    pk: ['cnplan', 'item'],
+    columns: [
+      'cnplan', 'item', 'proceso_codigo', 'nombre', 'descripcion', 'orden', 'prioridad',
+      'tiempo_estimado', 'estado', 'fecha_real', 'observacion', 'pct_cumplimiento',
+    ],
+    search: ['nombre', 'descripcion', 'proceso_codigo'],
+    orderBy: 'd.orden ASC, pr.codigo_num ASC, d.item ASC',
+    label: 'Actividades del Plan',
+    filterColumns: ['cnplan', 'estado', 'proceso_codigo'],
+    listFrom: `plantrabd d
+      LEFT JOIN qrysproc pr ON pr.codigo = d.proceso_codigo
+      LEFT JOIN qrysmod m ON m.codigo = pr.modulo
+      LEFT JOIN LATERAL (
+        SELECT g.codigo AS grupo_codigo, g.nombre AS grupo_nombre
+        FROM qrysgrupod gd
+        JOIN qrysgrupo g ON g.codigo = gd.grupo
+        WHERE gd.proceso = d.proceso_codigo AND COALESCE(g.estado, 'A') = 'A'
+        ORDER BY g.codigo
+        LIMIT 1
+      ) grp ON true`,
+    listSelect: `d.*, pr.modulo, pr.codigo_num, pr.tipo, pr.nombre AS proc_nombre,
+      m.nombre AS modulo_nombre, m.orden AS modulo_orden,
+      grp.grupo_codigo, grp.grupo_nombre`,
+    listSearch: ['d.nombre', 'd.descripcion', 'd.proceso_codigo'],
+    tableAlias: 'd',
   },
   actividades_proyecto: {
     table: 'actproy',

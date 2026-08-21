@@ -54,6 +54,34 @@ function capitalizeFirst(str) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function fmtDuracionPdf(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  return String(n);
+}
+
+function fmtObservacionSeguimiento(item) {
+  const parts = [];
+  const pct = item.pct_cumplimiento;
+  if (pct !== null && pct !== undefined && pct !== '') {
+    parts.push(`Cumplimiento: ${pct}%`);
+  }
+  const obs = String(item.observacion || '').trim();
+  if (obs) parts.push(obs);
+  return parts.length ? parts.join(' — ') : '—';
+}
+
+function temaPctCumplimiento(items) {
+  const withPct = items.filter((i) => i.pct_cumplimiento !== null && i.pct_cumplimiento !== undefined);
+  if (withPct.length) {
+    const sum = withPct.reduce((s, i) => s + Number(i.pct_cumplimiento), 0);
+    return Math.round(sum / withPct.length);
+  }
+  if (!items.length) return 0;
+  const done = items.filter((i) => (i.estado || '') === 'Realizado').length;
+  return Math.round((done / items.length) * 100);
+}
+
 function toPt(units) {
   return (units / 1000) * 72;
 }
@@ -158,7 +186,7 @@ function rowHeightForCellTexts(doc, L, cells, minHU = 220) {
 function estimateItemRowHeight(doc, L, item, tipo, cols) {
   const cells = [{ text: capitalizeFirst(item.descripcion || '—'), colWU: cols[1].w }];
   if (tipo === 'seguimiento') {
-    cells.push({ text: item.observacion || '—', colWU: cols[5].w });
+    cells.push({ text: fmtObservacionSeguimiento(item), colWU: cols[5].w });
   }
   return rowHeightForCellTexts(doc, L, cells);
 }
@@ -406,7 +434,7 @@ function drawItemRow(doc, L, yU, item, tipo, cols, idNum, tableLeft = HDR_LEFT) 
     lineBreak: true,
   });
   xU += cols[1].w;
-  textIn(doc, item.duracion ?? '—', L.px(xU), yMid, L.pw(cols[2].w), {
+  textIn(doc, fmtDuracionPdf(item.duracion), L.px(xU), yMid, L.pw(cols[2].w), {
     size: 8,
     align: 'center',
   });
@@ -424,7 +452,7 @@ function drawItemRow(doc, L, yU, item, tipo, cols, idNum, tableLeft = HDR_LEFT) 
     });
     xU += cols[4].w;
     const obsWidthPt = L.pw(cellContentWidthUnits(cols[5].w));
-    textIn(doc, item.observacion || '—', L.px(xU + CELL_TEXT_PAD), yText, obsWidthPt, {
+    textIn(doc, fmtObservacionSeguimiento(item), L.px(xU + CELL_TEXT_PAD), yText, obsWidthPt, {
       size: 8,
       lineBreak: true,
     });
@@ -433,12 +461,18 @@ function drawItemRow(doc, L, yU, item, tipo, cols, idNum, tableLeft = HDR_LEFT) 
   return yU + rowHU;
 }
 
-function drawTemaResumenBox(doc, L, yU, grupo, tableLeft = HDR_LEFT, tableW = HDR_W) {
-  const totalMin = grupo.items.reduce((s, i) => s + (Number(i.duracion) || 0), 0);
+function drawTemaResumenBox(doc, L, yU, grupo, tipo, tableLeft = HDR_LEFT, tableW = HDR_W) {
+  const mins = grupo.items.map((i) => Number(i.duracion)).filter((n) => Number.isFinite(n) && n > 0);
+  const totalMin = mins.reduce((s, n) => s + n, 0);
   const hU = 220;
   drawInnerBox(doc, L, tableLeft, yU, tableW, hU);
 
-  const resumenText = `Total items: ${grupo.items.length} | Duracion total estimada: ${totalMin} min`;
+  const parts = [`Total ítems: ${grupo.items.length}`];
+  if (totalMin > 0) parts.push(`Duración: ${totalMin} min`);
+  if (tipo === 'seguimiento') {
+    parts.push(`Cumplimiento: ${temaPctCumplimiento(grupo.items)}%`);
+  }
+  const resumenText = parts.join(' | ');
 
   textIn(doc, resumenText, L.px(tableLeft + 31), L.py(yU) + L.ph(hU) * 0.35, L.pw(tableW - 62), {
     size: 9,
@@ -566,18 +600,74 @@ function drawTemaSection(doc, L, grupo, yU, tipo) {
     y = drawItemRow(doc, L, y, grupo.items[i], tipo, cols, i + 1, tableLeft);
   }
 
-  y = drawTemaResumenBox(doc, L, y, grupo, tableLeft, tableW);
+  y = drawTemaResumenBox(doc, L, y, grupo, tipo, tableLeft, tableW);
   closeOuterSegment(y + SECTION_OUTER_PAD);
 
   return y + SECTION_OUTER_PAD + TEMA_SECTION_GAP;
 }
 
-function drawResumenGlobal(doc, L, yU, grupos, items) {
-  const totalMin = items.reduce((s, i) => s + (Number(i.duracion) || 0), 0);
+function drawModuloHeader(doc, L, yU, moduloNombre) {
+  const hU = 260;
+  drawInnerBox(doc, L, HDR_LEFT, yU, HDR_W, hU, { fill: '#E8EAF6' });
+  textIn(doc, moduloNombre || 'Módulo', L.px(HDR_LEFT + 40), L.py(yU) + L.ph(hU) * 0.32, L.pw(HDR_W - 80), {
+    size: 11,
+    bold: true,
+  });
+  return yU + hU + 40;
+}
+
+function groupByModuloAndTema(items) {
+  const modMap = new Map();
+  for (const item of items) {
+    const mk = item.modulo_codigo || '_';
+    if (!modMap.has(mk)) {
+      modMap.set(mk, {
+        modulo_codigo: mk,
+        modulo_nombre: item.modulo_nombre || 'Sin módulo',
+        modulo_orden: item.modulo_orden ?? 999,
+        temasMap: new Map(),
+      });
+    }
+    const mod = modMap.get(mk);
+    const tk = item.tema_codigo || item.tema_nombre || '_';
+    if (!mod.temasMap.has(tk)) mod.temasMap.set(tk, []);
+    mod.temasMap.get(tk).push(item);
+  }
+  return [...modMap.values()]
+    .sort((a, b) => (a.modulo_orden ?? 999) - (b.modulo_orden ?? 999))
+    .map((m) => ({
+      modulo_codigo: m.modulo_codigo,
+      modulo_nombre: m.modulo_nombre,
+      temas: sortGruposByFechaProbable(
+        [...m.temasMap.entries()].map(([, rows]) => {
+          const sorted = rows.sort((a, b) => (Number(a.item) || 0) - (Number(b.item) || 0));
+          return {
+            tema_codigo: sorted[0]?.tema_codigo,
+            tema_nombre: sorted[0]?.tema_nombre || 'Sin tema',
+            items: sorted,
+            fecha_hora_sugerida: temaFechaHoraSugerida(sorted),
+            dirigidoa: sorted[0]?.dirigidoa || '',
+          };
+        }),
+      ),
+    }));
+}
+
+function hasModuloLayout(items) {
+  return items.some((r) => r.modulo_codigo);
+}
+
+function drawResumenGlobal(doc, L, yU, grupos, items, tipo) {
+  const mins = items.map((i) => Number(i.duracion)).filter((n) => Number.isFinite(n) && n > 0);
+  const totalMin = mins.reduce((s, n) => s + n, 0);
   const hU = 220;
   drawInnerBox(doc, L, HDR_LEFT, yU, HDR_W, hU);
-  const resumenText =
-    `Total temas: ${grupos.length} | Total items: ${items.length} | Tiempo estimado: ${totalMin} min`;
+  const parts = [`Total temas: ${grupos.length}`, `Total ítems: ${items.length}`];
+  if (totalMin > 0) parts.push(`Tiempo estimado: ${totalMin} min`);
+  if (tipo === 'seguimiento') {
+    parts.push(`Cumplimiento global: ${temaPctCumplimiento(items)}%`);
+  }
+  const resumenText = parts.join(' | ');
   textIn(doc, resumenText, L.px(31), L.py(yU) + L.ph(hU) * 0.35, L.pw(HDR_W - 62), {
     size: 9,
     bold: true,
@@ -630,25 +720,55 @@ export function buildCronogramaPdf({ encabezado, items, tipo = 'programacion' })
 
     const L = createLayout(doc);
     let y = drawHeader(doc, L, encabezado);
-    const grupos = groupByTema(items);
 
-    for (const grupo of grupos) {
-      const blockEstimate =
-        BASE_TEMA_H + TEMA_DIRIGIDO_GAP + 320 + 250 + grupo.items.length * 240 + 320
-        + SECTION_OUTER_PAD * 2 + TEMA_SECTION_GAP;
-      if (y + blockEstimate > L.pageBottom) {
-        doc.addPage({ size: 'LETTER', layout: 'portrait' });
-        y = 120;
+    if (hasModuloLayout(items)) {
+      const modulos = groupByModuloAndTema(items);
+      let totalTemas = 0;
+      for (const mod of modulos) {
+        const modEstimate = 320 + mod.temas.length * 1200;
+        if (y + modEstimate > L.pageBottom) {
+          doc.addPage({ size: 'LETTER', layout: 'portrait' });
+          y = 120;
+        }
+        y = drawModuloHeader(doc, L, y, mod.modulo_nombre);
+        for (const grupo of mod.temas) {
+          totalTemas += 1;
+          const blockEstimate =
+            BASE_TEMA_H + TEMA_DIRIGIDO_GAP + 320 + 250 + grupo.items.length * 240 + 320
+            + SECTION_OUTER_PAD * 2 + TEMA_SECTION_GAP;
+          if (y + blockEstimate > L.pageBottom) {
+            doc.addPage({ size: 'LETTER', layout: 'portrait' });
+            y = 120;
+          }
+          y = drawTemaSection(doc, L, grupo, y, tipo);
+        }
       }
-      y = drawTemaSection(doc, L, grupo, y, tipo);
-    }
-
-    if (grupos.length > 1) {
-      if (y + 260 > L.pageBottom) {
-        doc.addPage({ size: 'LETTER', layout: 'portrait' });
-        y = 120;
+      if (totalTemas > 1) {
+        if (y + 260 > L.pageBottom) {
+          doc.addPage({ size: 'LETTER', layout: 'portrait' });
+          y = 120;
+        }
+        drawResumenGlobal(doc, L, y, modulos.flatMap((m) => m.temas), items, tipo);
       }
-      drawResumenGlobal(doc, L, y, grupos, items);
+    } else {
+      const grupos = groupByTema(items);
+      for (const grupo of grupos) {
+        const blockEstimate =
+          BASE_TEMA_H + TEMA_DIRIGIDO_GAP + 320 + 250 + grupo.items.length * 240 + 320
+          + SECTION_OUTER_PAD * 2 + TEMA_SECTION_GAP;
+        if (y + blockEstimate > L.pageBottom) {
+          doc.addPage({ size: 'LETTER', layout: 'portrait' });
+          y = 120;
+        }
+        y = drawTemaSection(doc, L, grupo, y, tipo);
+      }
+      if (grupos.length > 1) {
+        if (y + 260 > L.pageBottom) {
+          doc.addPage({ size: 'LETTER', layout: 'portrait' });
+          y = 120;
+        }
+        drawResumenGlobal(doc, L, y, grupos, items, tipo);
+      }
     }
 
     doc.end();

@@ -8,7 +8,7 @@
         <div>
           <p class="temas-hero__eyebrow">Configuración</p>
           <h1 class="temas-hero__title">Temas de capacitación</h1>
-          <p class="temas-hero__subtitle">Catálogo de temas mayores e ítems con duración sugerida.</p>
+          <p class="temas-hero__subtitle">Catálogo por área del plan: cada tema agrupa los procesos a capacitar (Inventario, Financiero…).</p>
         </div>
       </div>
       <div class="temas-hero__meta">
@@ -32,13 +32,37 @@
             dense
             outlined
             debounce="400"
-            placeholder="Buscar tema..."
+            placeholder="Buscar tema o agrupador..."
             class="temas-search"
             bg-color="white"
             @update:model-value="onSearchTema"
           >
             <template #prepend><q-icon name="search" color="grey-6" /></template>
           </q-input>
+          <q-btn-toggle
+            v-model="vistaAgrupada"
+            spread
+            no-caps
+            dense
+            unelevated
+            toggle-color="primary"
+            color="grey-3"
+            text-color="grey-8"
+            class="temas-view-toggle"
+            :options="[
+              { label: 'Por módulo', value: true, icon: 'account_tree' },
+              { label: 'Tabla', value: false, icon: 'table_rows' },
+            ]"
+            @update:model-value="onVistaChange"
+          />
+          <q-btn
+            flat
+            color="secondary"
+            icon="hub"
+            label="Desde agrupador Qrystalos"
+            class="temas-btn"
+            @click="openImportGrupo"
+          />
           <q-btn
             unelevated
             color="primary"
@@ -51,6 +75,7 @@
       </header>
 
       <q-table
+        v-if="!vistaAgrupada"
         class="temas-table"
         :rows="temaRows"
         :columns="temaColumns"
@@ -105,6 +130,17 @@
               </template>
               <template v-else-if="col.name === 'nombre'">
                 <span class="temas-table__nombre-text">{{ col.value }}</span>
+              </template>
+              <template v-else-if="col.name === 'grupo_nombre'">
+                <span v-if="props.row.qrys_grupo" class="temas-grupo-badge">
+                  <q-icon name="hub" size="14px" class="q-mr-xs" />
+                  {{ props.row.grupo_nombre || props.row.qrys_grupo }}
+                  <span class="temas-grupo-badge__code">{{ props.row.qrys_grupo }}</span>
+                </span>
+                <span v-else class="text-grey-6">—</span>
+              </template>
+              <template v-else-if="col.name === 'items_count'">
+                <q-badge color="primary" outline :label="props.row.items_count ?? 0" />
               </template>
               <template v-else>{{ col.value }}</template>
             </q-td>
@@ -175,6 +211,268 @@
           </q-tr>
         </template>
       </q-table>
+
+      <div v-else class="temas-grouped">
+        <q-inner-loading :showing="loadingTema" />
+
+        <q-banner
+          v-if="temasConModulo.length"
+          dense
+          rounded
+          class="temas-grouped__banner bg-purple-1 text-purple-10 q-mb-md"
+        >
+          <template #avatar>
+            <q-icon name="hub" color="purple" />
+          </template>
+          Organizado por módulo del plan; cada tema es un área (Inventario, Financiero…) con sus procesos. Expanda para ver el detalle.
+        </q-banner>
+
+        <template v-if="moduloGroups.length">
+          <section
+            v-for="mod in moduloGroups"
+            :key="`mod:${mod.modulo_codigo}`"
+            class="modulo-group"
+          >
+            <header class="modulo-group__header">
+              <q-icon name="folder" size="18px" class="q-mr-sm" color="primary" />
+              <strong>{{ mod.modulo_nombre }}</strong>
+              <q-badge color="primary" outline class="q-ml-sm" :label="`${mod.temas.length} áreas`" />
+            </header>
+
+            <section
+              v-for="tema in mod.temas"
+              :key="tema.codigo"
+              class="tema-group tema-group--nested"
+              :class="{ 'tema-group--collapsed': expandedCodigo !== tema.codigo }"
+            >
+              <header
+                class="tema-group__header"
+                role="button"
+                tabindex="0"
+                @click="toggleExpand(tema)"
+                @keydown.enter.space.prevent="toggleExpand(tema)"
+              >
+                <q-btn
+                  flat
+                  dense
+                  round
+                  size="sm"
+                  :icon="expandedCodigo === tema.codigo ? 'expand_less' : 'expand_more'"
+                  color="primary"
+                  @click.stop="toggleExpand(tema)"
+                />
+                <q-icon name="category" size="16px" class="q-mr-xs" />
+                <div class="tema-group__main">
+                  <strong class="tema-group__title">{{ tema.nombre }}</strong>
+                  <div class="tema-group__meta">
+                    <span v-if="tema.qrys_grupo" class="temas-grupo-badge temas-grupo-badge--compact">
+                      {{ tema.grupo_nombre || tema.qrys_grupo }}
+                      <span v-if="tema.grupo_nombre" class="temas-grupo-badge__code">{{ tema.qrys_grupo }}</span>
+                    </span>
+                    <q-badge
+                      :color="tema.estado === 'A' ? 'positive' : 'grey-6'"
+                      :label="tema.estado === 'A' ? 'Activo' : 'Inactivo'"
+                      class="temas-badge q-ml-xs"
+                    />
+                    <q-badge color="primary" outline class="q-ml-xs" :label="`${tema.items_count ?? 0} ítems`" />
+                    <q-badge
+                      v-if="tema.cnplan"
+                      color="teal"
+                      outline
+                      class="q-ml-xs"
+                      :label="`Plan ${tema.cnplan}`"
+                    />
+                  </div>
+                </div>
+                <div class="tema-group__actions" @click.stop>
+                  <q-btn flat dense round icon="edit" color="primary" @click="openTemaEdit(tema)">
+                    <q-tooltip>Editar tema</q-tooltip>
+                  </q-btn>
+                  <q-btn flat dense round icon="delete" color="negative" @click="confirmTemaDelete(tema)">
+                    <q-tooltip>Eliminar tema</q-tooltip>
+                  </q-btn>
+                </div>
+              </header>
+
+              <div v-if="expandedCodigo === tema.codigo" class="tema-group__body">
+                <div class="items-expand items-expand--nested">
+                  <header class="items-expand__header">
+                    <h3 class="items-expand__title">
+                      <q-icon name="list_alt" size="18px" class="q-mr-xs" />
+                      Ítems del área
+                    </h3>
+                    <q-btn
+                      unelevated
+                      color="primary"
+                      icon="add"
+                      label="Agregar ítem"
+                      size="sm"
+                      class="temas-btn"
+                      @click="openItemCreate(tema)"
+                    />
+                  </header>
+
+                  <q-inner-loading :showing="isItemLoading(tema.codigo)" />
+
+                  <q-table
+                    v-if="getItemRows(tema.codigo).length"
+                    class="items-table"
+                    :rows="getItemRows(tema.codigo)"
+                    :columns="itemColumns"
+                    :row-key="itemRowKey"
+                    flat
+                    bordered
+                    dense
+                    hide-pagination
+                    :pagination="{ rowsPerPage: 0 }"
+                  >
+                    <template #body-cell-estado="cell">
+                      <q-td :props="cell">
+                        <q-badge
+                          :color="cell.row.estado === 'A' ? 'positive' : 'grey-6'"
+                          :label="cell.row.estado === 'A' ? 'Activo' : 'Inactivo'"
+                          class="temas-badge"
+                        />
+                      </q-td>
+                    </template>
+                    <template #body-cell-acciones="cell">
+                      <q-td :props="cell">
+                        <div class="temas-actions">
+                          <q-btn flat dense round icon="edit" color="primary" @click="openItemEdit(cell.row)">
+                            <q-tooltip>Editar</q-tooltip>
+                          </q-btn>
+                          <q-btn flat dense round icon="delete" color="negative" @click="confirmItemDelete(cell.row)">
+                            <q-tooltip>Eliminar</q-tooltip>
+                          </q-btn>
+                        </div>
+                      </q-td>
+                    </template>
+                  </q-table>
+
+                  <div v-else-if="!isItemLoading(tema.codigo)" class="items-expand__empty">
+                    <q-icon name="playlist_remove" size="28px" color="grey-4" />
+                    <span>Este área no tiene ítems registrados.</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </section>
+        </template>
+
+        <section v-if="temasSinModulo.length" class="modulo-group modulo-group--manual">
+          <header class="modulo-group__header">
+            <q-icon name="edit_note" size="18px" class="q-mr-sm" color="grey-7" />
+            <strong>Temas manuales</strong>
+            <q-badge color="grey-6" outline class="q-ml-sm" :label="`${temasSinModulo.length} temas`" />
+          </header>
+
+          <section
+            v-for="tema in temasSinModulo"
+            :key="tema.codigo"
+            class="tema-group tema-group--nested"
+            :class="{ 'tema-group--collapsed': expandedCodigo !== tema.codigo }"
+          >
+            <header
+              class="tema-group__header"
+              role="button"
+              tabindex="0"
+              @click="toggleExpand(tema)"
+              @keydown.enter.space.prevent="toggleExpand(tema)"
+            >
+              <q-btn
+                flat
+                dense
+                round
+                size="sm"
+                :icon="expandedCodigo === tema.codigo ? 'expand_less' : 'expand_more'"
+                color="primary"
+                @click.stop="toggleExpand(tema)"
+              />
+              <div class="tema-group__main">
+                <strong class="tema-group__title">{{ tema.nombre }}</strong>
+                <div class="tema-group__meta">
+                  <q-badge color="primary" outline :label="`${tema.items_count ?? 0} ítems`" />
+                </div>
+              </div>
+              <div class="tema-group__actions" @click.stop>
+                <q-btn flat dense round icon="edit" color="primary" @click="openTemaEdit(tema)">
+                  <q-tooltip>Editar tema</q-tooltip>
+                </q-btn>
+                <q-btn flat dense round icon="delete" color="negative" @click="confirmTemaDelete(tema)">
+                  <q-tooltip>Eliminar tema</q-tooltip>
+                </q-btn>
+              </div>
+            </header>
+
+            <div v-if="expandedCodigo === tema.codigo" class="tema-group__body">
+              <div class="items-expand items-expand--nested">
+                <header class="items-expand__header">
+                  <h3 class="items-expand__title">
+                    <q-icon name="list_alt" size="18px" class="q-mr-xs" />
+                    Ítems del tema
+                  </h3>
+                  <q-btn
+                    unelevated
+                    color="primary"
+                    icon="add"
+                    label="Agregar ítem"
+                    size="sm"
+                    class="temas-btn"
+                    @click="openItemCreate(tema)"
+                  />
+                </header>
+
+                <q-inner-loading :showing="isItemLoading(tema.codigo)" />
+
+                <q-table
+                  v-if="getItemRows(tema.codigo).length"
+                  class="items-table"
+                  :rows="getItemRows(tema.codigo)"
+                  :columns="itemColumns"
+                  :row-key="itemRowKey"
+                  flat
+                  bordered
+                  dense
+                  hide-pagination
+                  :pagination="{ rowsPerPage: 0 }"
+                >
+                  <template #body-cell-estado="cell">
+                    <q-td :props="cell">
+                      <q-badge
+                        :color="cell.row.estado === 'A' ? 'positive' : 'grey-6'"
+                        :label="cell.row.estado === 'A' ? 'Activo' : 'Inactivo'"
+                        class="temas-badge"
+                      />
+                    </q-td>
+                  </template>
+                  <template #body-cell-acciones="cell">
+                    <q-td :props="cell">
+                      <div class="temas-actions">
+                        <q-btn flat dense round icon="edit" color="primary" @click="openItemEdit(cell.row)">
+                          <q-tooltip>Editar</q-tooltip>
+                        </q-btn>
+                        <q-btn flat dense round icon="delete" color="negative" @click="confirmItemDelete(cell.row)">
+                          <q-tooltip>Eliminar</q-tooltip>
+                        </q-btn>
+                      </div>
+                    </q-td>
+                  </template>
+                </q-table>
+
+                <div v-else-if="!isItemLoading(tema.codigo)" class="items-expand__empty">
+                  <q-icon name="playlist_remove" size="28px" color="grey-4" />
+                  <span>Este tema no tiene ítems registrados.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <div v-if="!loadingTema && !moduloGroups.length && !temasSinModulo.length" class="items-expand__empty">
+          <q-icon name="menu_book" size="28px" color="grey-4" />
+          <span>No hay temas que coincidan con la búsqueda.</span>
+        </div>
+      </div>
     </section>
 
     <GenericForm
@@ -192,19 +490,49 @@
       :is-edit="itemIsEdit"
       @saved="onItemSaved"
     />
+
+    <q-dialog v-model="importGrupoOpen" persistent>
+      <q-card style="min-width: 420px; max-width: 95vw">
+        <q-card-section>
+          <div class="text-h6">Tema desde agrupador Qrystalos</div>
+          <p class="text-caption text-grey q-mt-xs">
+            Crea un tema de capacitación con los procesos del agrupador (operativo + configuración).
+          </p>
+        </q-card-section>
+        <q-card-section class="q-gutter-md q-pt-none">
+          <q-select
+            v-model="importGrupoCodigo"
+            :options="importGrupoOptions"
+            emit-value
+            map-options
+            outlined
+            dense
+            label="Agrupador Qrystalos"
+          />
+          <q-input v-model="importGrupoNombre" outlined dense label="Nombre del tema (opcional)" />
+          <q-input v-model="importGrupoDirigidoa" outlined dense type="textarea" autogrow label="Dirigido a" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" v-close-popup />
+          <q-btn unelevated color="primary" label="Crear tema" :loading="importGrupoLoading"
+            :disable="!importGrupoCodigo" @click="confirmImportGrupo" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useQuasar } from 'quasar';
-import { useResource } from 'src/services/api';
+import { useResource, temasCapacitacionApi, extractApiError } from 'src/services/api';
 import { findModule } from 'src/config/modules';
 import GenericForm from 'components/GenericForm.vue';
 
 const $q = useQuasar();
 const temaApi = useResource('temas_capacitacion');
 const itemApi = useResource('temas_capacitacion_items');
+const grpApi = useResource('qrystalos_grupos');
 
 const mod = findModule('temas_capacitacion');
 const temaModule = computed(() => mod);
@@ -245,9 +573,51 @@ const itemIsEdit = ref(false);
 const temaCurrent = ref({});
 const itemCurrent = ref({});
 
+const importGrupoOpen = ref(false);
+const importGrupoCodigo = ref('');
+const importGrupoNombre = ref('');
+const importGrupoDirigidoa = ref('');
+const importGrupoOptions = ref([]);
+const importGrupoLoading = ref(false);
+const vistaAgrupada = ref(true);
+
 const currentItemRows = computed(() =>
   expandedCodigo.value ? getItemRows(expandedCodigo.value) : [],
 );
+
+const temasConModulo = computed(() =>
+  temaRows.value.filter((t) => t.modulo_codigo),
+);
+
+const temasSinModulo = computed(() =>
+  temaRows.value.filter((t) => !t.modulo_codigo),
+);
+
+const moduloGroups = computed(() => {
+  const modMap = new Map();
+  for (const tema of temasConModulo.value) {
+    const mk = tema.modulo_codigo || '_';
+    if (!modMap.has(mk)) {
+      modMap.set(mk, {
+        modulo_codigo: mk,
+        modulo_nombre: tema.modulo_nombre || 'Sin módulo',
+        modulo_orden: tema.modulo_orden ?? 999,
+        temas: [],
+      });
+    }
+    modMap.get(mk).temas.push(tema);
+  }
+  return [...modMap.values()]
+    .sort((a, b) => (a.modulo_orden ?? 999) - (b.modulo_orden ?? 999))
+    .map((m) => ({
+      ...m,
+      temas: m.temas.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')),
+    }));
+});
+
+function listLimit() {
+  return vistaAgrupada.value ? 500 : pagTema.value.rowsPerPage;
+}
 
 function itemRowKey(row) {
   return `${row.codigo}~${row.item}`;
@@ -270,8 +640,8 @@ async function loadTemas() {
   try {
     const res = await temaApi.list({
       q: searchTema.value,
-      page: pagTema.value.page,
-      limit: pagTema.value.rowsPerPage,
+      page: vistaAgrupada.value ? 1 : pagTema.value.page,
+      limit: listLimit(),
     });
     temaRows.value = res.data;
     pagTema.value.rowsNumber = res.total;
@@ -313,6 +683,12 @@ function toggleExpand(row) {
 }
 
 function onSearchTema() {
+  pagTema.value.page = 1;
+  expandedCodigo.value = null;
+  loadTemas();
+}
+
+function onVistaChange() {
   pagTema.value.page = 1;
   expandedCodigo.value = null;
   loadTemas();
@@ -407,6 +783,36 @@ async function onItemSaved() {
   itemIsEdit.value = false;
   await nextTick();
   formItemOpen.value = true;
+}
+
+async function openImportGrupo() {
+  importGrupoCodigo.value = '';
+  importGrupoNombre.value = '';
+  importGrupoDirigidoa.value = '';
+  const res = await grpApi.list({ estado: 'A', limit: 200 });
+  importGrupoOptions.value = res.data.map((g) => ({ label: g.nombre, value: g.codigo }));
+  importGrupoOpen.value = true;
+}
+
+async function confirmImportGrupo() {
+  importGrupoLoading.value = true;
+  try {
+    const result = await temasCapacitacionApi.desdeAgrupador({
+      grupo: importGrupoCodigo.value,
+      nombre: importGrupoNombre.value || undefined,
+      dirigidoa: importGrupoDirigidoa.value || undefined,
+    });
+    importGrupoOpen.value = false;
+    $q.notify({
+      type: 'positive',
+      message: `Tema «${result.nombre}» creado con ${result.count} ítems`,
+    });
+    loadTemas();
+  } catch (err) {
+    $q.notify({ type: 'negative', message: extractApiError(err) });
+  } finally {
+    importGrupoLoading.value = false;
+  }
 }
 
 onMounted(loadTemas);
@@ -523,6 +929,128 @@ onMounted(loadTemas);
 
 .temas-search {
   min-width: 220px;
+}
+
+.temas-view-toggle {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.temas-grupo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ede7f6;
+  color: #4527a0;
+  font-size: 0.78rem;
+  font-weight: 500;
+
+  &--compact {
+    padding: 1px 6px;
+    font-size: 0.72rem;
+  }
+
+  &__code {
+    opacity: 0.7;
+    font-size: 0.68rem;
+    font-weight: 400;
+  }
+}
+
+.temas-grouped {
+  position: relative;
+  min-height: 120px;
+}
+
+.temas-grouped__banner {
+  font-size: 0.82rem;
+}
+
+.modulo-group {
+  margin-bottom: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafafa;
+
+  &--manual {
+    background: #fff;
+  }
+}
+
+.modulo-group__header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #e8eaf6 0%, #ede7f6 100%);
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.tema-group {
+  margin: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+
+  &--nested {
+    margin: 8px;
+  }
+
+  &--collapsed .tema-group__body {
+    display: none;
+  }
+}
+
+.tema-group__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+  cursor: pointer;
+
+  &:hover {
+    background: #f8fafc;
+  }
+}
+
+.tema-group__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tema-group__title {
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.tema-group__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.tema-group__actions {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tema-group__body {
+  border-top: 1px solid #e2e8f0;
+}
+
+.items-expand--nested {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: #faf8ff;
 }
 
 .temas-btn {

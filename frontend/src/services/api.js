@@ -208,12 +208,65 @@ export const cronogramaApi = {
       .then((r) => r.data),
   cambiarEstadoTema: (id, payload) =>
     api.post(`/cronograma/${encodeURIComponent(id)}/tema/cambiar-estado`, payload).then((r) => r.data),
+  excel: (id) =>
+    api.get(`/cronograma/${encodeURIComponent(id)}/excel`, { responseType: 'blob' }),
+  importExcel: (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api
+      .post(`/cronograma/${encodeURIComponent(id)}/import-excel`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
   cronogramasActa: (cliente) =>
     api.get(`/cronograma/cliente/${encodeURIComponent(cliente)}/cronogramas-acta`).then((r) => r.data),
   temasActa: (id) =>
     api.get(`/cronograma/${encodeURIComponent(id)}/temas-acta`).then((r) => r.data),
   prefillActa: (id, temaCodigo) =>
     api.get(`/cronograma/${encodeURIComponent(id)}/tema/${encodeURIComponent(temaCodigo)}/prefill-acta`).then((r) => r.data),
+};
+
+export const qrystalosApi = {
+  procesosGrupo: (grupo) =>
+    api.get(`/qrystalos_grupos/${encodeURIComponent(grupo)}/procesos`).then((r) => r.data),
+};
+
+export const planTrabajoApi = {
+  pdf: (id) =>
+    api.get(`/plan_trabajo/${encodeURIComponent(id)}/pdf`, { responseType: 'blob' }),
+  excel: (id) =>
+    api.get(`/plan_trabajo/${encodeURIComponent(id)}/excel`, { responseType: 'blob' }),
+  importExcel: (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api
+      .post(`/plan_trabajo/${encodeURIComponent(id)}/import-excel`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
+  agregarProcesos: (id, procesos) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/agregar-procesos`, { procesos }).then((r) => r.data),
+  agregarGrupo: (id, payload) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/agregar-grupo`, payload).then((r) => r.data),
+  reordenar: (id, items) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/reordenar`, { items }).then((r) => r.data),
+  reorganizarModulo: (id) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/reorganizar-modulo`).then((r) => r.data),
+  reorganizarAgrupador: (id) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/reorganizar-agrupador`).then((r) => r.data),
+  moverAgrupador: (id, payload) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/mover-agrupador`, payload).then((r) => r.data),
+  generarCronograma: (id, payload = {}) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/generar-cronograma`, payload).then((r) => r.data),
+  sincronizarCronograma: (id) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/sincronizar-cronograma`).then((r) => r.data),
+};
+
+export const temasCapacitacionApi = {
+  desdeAgrupador: (payload) =>
+    api.post('/temas_capacitacion/desde-agrupador', payload).then((r) => r.data),
 };
 
 export const notificacionApi = {
@@ -225,12 +278,16 @@ export const notificacionApi = {
     api
       .get(`/cronograma/${encodeURIComponent(id)}/preview-notificacion`, { params: { tipo } })
       .then((r) => r.data),
+  previewPlanTrabajo: (id) =>
+    api.get(`/plan_trabajo/${encodeURIComponent(id)}/preview-notificacion`).then((r) => r.data),
   capacitacion: (id, payload) =>
     api.post(`/capacitaciones/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
   bitacora: (id, payload) =>
     api.post(`/bitacora/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
   cronograma: (id, payload) =>
     api.post(`/cronograma/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
+  planTrabajo: (id, payload) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/enviar-notificacion`, payload).then((r) => r.data),
 };
 
 export const controlVersionesApi = {
