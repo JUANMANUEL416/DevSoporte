@@ -8,6 +8,7 @@ import {
   reorganizarPlanPorAgrupador,
   reordenarPlanItems,
   moverBloqueAgrupadorPlan,
+  moverBloqueModuloPlan,
 } from '../services/planTrabajoHooks.js';
 import { importTemaDesdeGrupo } from '../services/temasCapacitacionHooks.js';
 
@@ -75,6 +76,16 @@ export async function reordenarHandler(req, res, next) {
 export async function moverAgrupadorHandler(req, res, next) {
   try {
     const result = await moverBloqueAgrupadorPlan(req.params.id, req.body || {});
+    res.json(result);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+}
+
+export async function moverModuloHandler(req, res, next) {
+  try {
+    const result = await moverBloqueModuloPlan(req.params.id, req.body || {});
     res.json(result);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });

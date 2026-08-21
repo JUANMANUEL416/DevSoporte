@@ -258,6 +258,8 @@ export const planTrabajoApi = {
     api.post(`/plan_trabajo/${encodeURIComponent(id)}/reorganizar-agrupador`).then((r) => r.data),
   moverAgrupador: (id, payload) =>
     api.post(`/plan_trabajo/${encodeURIComponent(id)}/mover-agrupador`, payload).then((r) => r.data),
+  moverModulo: (id, payload) =>
+    api.post(`/plan_trabajo/${encodeURIComponent(id)}/mover-modulo`, payload).then((r) => r.data),
   generarCronograma: (id, payload = {}) =>
     api.post(`/plan_trabajo/${encodeURIComponent(id)}/generar-cronograma`, payload).then((r) => r.data),
   sincronizarCronograma: (id) =>

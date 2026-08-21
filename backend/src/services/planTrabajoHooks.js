@@ -539,6 +539,96 @@ export async function generarCronogramaDesdePlan(cnplan, payload = {}) {
   };
 }
 
+/** Corrige tema_codigo/tema_nombre de ítems ya en cronograma según área actual del plan. */
+export async function repararTemasCronogramaDesdePlan(cnplan) {
+  const planRes = await query('SELECT cnplan, cnscrono FROM plantrab WHERE cnplan = $1', [cnplan]);
+  const plan = planRes.rows[0];
+  if (!plan?.cnscrono) {
+    return { actualizados: 0, cnscrono: null, mensaje: 'Sin cronograma vinculado' };
+  }
+
+  const cnscrono = plan.cnscrono;
+  await ensureCronogramaEditable(cnscrono);
+
+  const planItemsRes = await query(
+    `SELECT d.item, d.nombre, d.proceso_codigo, pr.nombre AS proc_nombre,
+            m.codigo AS modulo, m.nombre AS modulo_nombre, m.orden AS modulo_orden,
+            grp.grupo_nombre
+     FROM plantrabd d
+     JOIN qrysproc pr ON pr.codigo = d.proceso_codigo
+     JOIN qrysmod m ON m.codigo = pr.modulo
+     ${PLAN_ITEM_GRUPO_LATERAL}
+     WHERE d.cnplan = $1 AND d.estado <> 'Cancelado' AND d.proceso_codigo IS NOT NULL`,
+    [cnplan],
+  );
+
+  const cronoRes = await query('SELECT * FROM cronocapd WHERE cnscrono = $1', [cnscrono]);
+  const cronoRows = cronoRes.rows;
+  if (!planItemsRes.rows.length || !cronoRows.length) {
+    return { actualizados: 0, cnscrono, mensaje: 'Sin ítems que reparar' };
+  }
+
+  const { crearTemaDesdePlanArea } = await import('./temasCapacitacionHooks.js');
+  const temasCreados = new Set();
+  let actualizados = 0;
+
+  for (const pi of planItemsRes.rows) {
+    const area = planItemArea(pi.nombre, pi.proc_nombre, pi.modulo_nombre);
+    if (!area) continue;
+
+    const descripcion = planItemSubtitulo(pi.nombre, pi.proc_nombre, pi.grupo_nombre);
+    const temaCodigo = temaCodigoArea(pi.modulo, area);
+    const procNombre = String(pi.proc_nombre || '').trim();
+
+    const match =
+      cronoRows.find(
+        (c) =>
+          c.modulo_codigo === pi.modulo &&
+          String(c.descripcion || '').trim() === String(descripcion || '').trim(),
+      ) ||
+      cronoRows.find(
+        (c) =>
+          c.modulo_codigo === pi.modulo &&
+          procNombre &&
+          (String(c.descripcion || '').trim() === procNombre ||
+            String(c.tema_nombre || '').trim() === procNombre),
+      );
+
+    if (!match) continue;
+
+    const temaKey = `${pi.modulo}|${area}`;
+    if (!temasCreados.has(temaKey)) {
+      await crearTemaDesdePlanArea(cnplan, pi.modulo, area);
+      temasCreados.add(temaKey);
+    }
+
+    if (
+      match.tema_codigo !== temaCodigo ||
+      String(match.tema_nombre || '').trim() !== area ||
+      match.modulo_codigo !== pi.modulo
+    ) {
+      await query(
+        `UPDATE cronocapd
+         SET tema_codigo = $1, tema_nombre = $2,
+             modulo_codigo = $3, modulo_nombre = $4, modulo_orden = $5
+         WHERE cnscrono = $6 AND item = $7`,
+        [temaCodigo, area, pi.modulo, pi.modulo_nombre, pi.modulo_orden, cnscrono, match.item],
+      );
+      match.tema_codigo = temaCodigo;
+      match.tema_nombre = area;
+      actualizados += 1;
+    }
+  }
+
+  return {
+    actualizados,
+    cnscrono,
+    mensaje: actualizados
+      ? `Se reagruparon ${actualizados} ítem(s) del cronograma bajo su área correcta`
+      : 'Los temas del cronograma ya están agrupados correctamente',
+  };
+}
+
 /** Agrega al cronograma existente las áreas del plan que aún no tienen tema. */
 export async function sincronizarCronogramaDesdePlan(cnplan) {
   const planRes = await query(
@@ -559,6 +649,8 @@ export async function sincronizarCronogramaDesdePlan(cnplan) {
 
   const cnscrono = plan.cnscrono;
   await ensureCronogramaEditable(cnscrono);
+
+  const reparacion = await repararTemasCronogramaDesdePlan(cnplan);
 
   const secciones = await listPlanSeccionesArea(cnplan);
   if (!secciones.length) {
@@ -611,12 +703,15 @@ export async function sincronizarCronogramaDesdePlan(cnplan) {
     items: totalItems,
     temas,
     omitidos,
+    reparacion,
     advertencia: omitidos.length
       ? `Áreas sin actividades válidas (omitidas): ${omitidos.join(', ')}`
       : null,
-    mensaje: temas.length
-      ? `Se agregaron ${temas.length} tema(s) y ${totalItems} ítem(s) al cronograma`
-      : 'El cronograma ya incluye todas las áreas del plan',
+    mensaje: reparacion.actualizados
+      ? `${reparacion.mensaje}. ${temas.length ? `Se agregaron ${temas.length} tema(s) y ${totalItems} ítem(s)` : 'El cronograma ya incluye todas las áreas del plan'}`
+      : temas.length
+        ? `Se agregaron ${temas.length} tema(s) y ${totalItems} ítem(s) al cronograma`
+        : 'El cronograma ya incluye todas las áreas del plan',
   };
 }
 
@@ -659,7 +754,7 @@ export async function reorganizarPlanPorAgrupador(cnplan) {
   await ensurePlanEditable(cnplan);
   const res = await query(
     `SELECT d.cnplan, d.item, d.nombre, pr.codigo_num, pr.nombre AS proc_nombre,
-            m.orden AS modulo_orden, grp.grupo_codigo, grp.grupo_nombre
+            m.orden AS modulo_orden, m.nombre AS modulo_nombre, grp.grupo_codigo, grp.grupo_nombre
      FROM plantrabd d
      LEFT JOIN qrysproc pr ON pr.codigo = d.proceso_codigo
      LEFT JOIN qrysmod m ON m.codigo = pr.modulo
@@ -671,8 +766,8 @@ export async function reorganizarPlanPorAgrupador(cnplan) {
   const rows = [...res.rows].sort((a, b) => {
     const mo = (a.modulo_orden ?? 999) - (b.modulo_orden ?? 999);
     if (mo !== 0) return mo;
-    const aa = planItemArea(a.nombre, a.proc_nombre).localeCompare(
-      planItemArea(b.nombre, b.proc_nombre),
+    const aa = planItemArea(a.nombre, a.proc_nombre, a.modulo_nombre).localeCompare(
+      planItemArea(b.nombre, b.proc_nombre, b.modulo_nombre),
       'es',
     );
     if (aa !== 0) return aa;
@@ -721,7 +816,7 @@ function buildPlanAreaBlocks(items) {
   const blockMap = new Map();
   for (const item of items) {
     const modulo = item.modulo || '_';
-    const area = planItemArea(item.nombre, item.proc_nombre) || 'General';
+    const area = planItemArea(item.nombre, item.proc_nombre, item.modulo_nombre) || 'General';
     const key = `${modulo}|${area}`;
     if (!blockMap.has(key)) {
       blockMap.set(key, {
@@ -758,7 +853,7 @@ export async function moverBloqueAgrupadorPlan(cnplan, { modulo, area, delta }) 
 
   const res = await query(
     `SELECT d.cnplan, d.item, d.nombre, d.orden, pr.modulo, pr.nombre AS proc_nombre,
-            m.orden AS modulo_orden
+            m.orden AS modulo_orden, m.nombre AS modulo_nombre
      FROM plantrabd d
      LEFT JOIN qrysproc pr ON pr.codigo = d.proceso_codigo
      LEFT JOIN qrysmod m ON m.codigo = pr.modulo
@@ -799,23 +894,33 @@ export async function moverBloqueAgrupadorPlan(cnplan, { modulo, area, delta }) 
 
   [modBlocks[idx], modBlocks[newIdx]] = [modBlocks[newIdx], modBlocks[idx]];
 
-  const modulos = [...byMod.keys()].sort((a, b) => {
-    const ao = byMod.get(a)[0]?.modulo_orden ?? 999;
-    const bo = byMod.get(b)[0]?.modulo_orden ?? 999;
-    if (ao !== bo) return ao - bo;
-    return String(a).localeCompare(String(b), 'es');
-  });
+  const modulos = [...byMod.entries()]
+    .map(([mod, blocks]) => {
+      const sorted = mod === modKey
+        ? modBlocks
+        : blocks.sort((a, b) => {
+          const diff = (a.minOrden ?? 999) - (b.minOrden ?? 999);
+          if (diff !== 0) return diff;
+          return a.area.localeCompare(b.area, 'es');
+        });
+      return {
+        modulo: mod,
+        minOrden: sorted[0]?.minOrden ?? 999,
+        modulo_orden: sorted[0]?.modulo_orden ?? 999,
+        blocks: sorted,
+      };
+    })
+    .sort((a, b) => {
+      const diff = a.minOrden - b.minOrden;
+      if (diff !== 0) return diff;
+      const mo = a.modulo_orden - b.modulo_orden;
+      if (mo !== 0) return mo;
+      return String(a.modulo).localeCompare(String(b.modulo), 'es');
+    });
 
   const allBlocks = [];
   for (const mod of modulos) {
-    const blocks = mod === modKey
-      ? modBlocks
-      : byMod.get(mod).sort((a, b) => {
-        const diff = (a.minOrden ?? 999) - (b.minOrden ?? 999);
-        if (diff !== 0) return diff;
-        return a.area.localeCompare(b.area, 'es');
-      });
-    allBlocks.push(...blocks);
+    allBlocks.push(...mod.blocks);
   }
 
   let orden = 1;
@@ -824,6 +929,95 @@ export async function moverBloqueAgrupadorPlan(cnplan, { modulo, area, delta }) 
     for (const item of block.items) {
       updates.push({ item: item.item, orden });
       orden += 1;
+    }
+  }
+
+  return reordenarPlanItems(cnplan, updates);
+}
+
+/** Mueve un bloque completo de módulo (con todos sus agrupadores) hacia arriba o abajo. */
+export async function moverBloqueModuloPlan(cnplan, { modulo, delta }) {
+  await ensurePlanEditable(cnplan);
+  const shift = Number(delta);
+  if (!Number.isFinite(shift) || shift === 0) {
+    const err = new Error('Indique la dirección del movimiento (delta distinto de cero)');
+    err.status = 400;
+    throw err;
+  }
+  const modKey = modulo != null && String(modulo).trim() !== '' ? String(modulo).trim() : '_';
+  if (modKey === '_') {
+    const err = new Error('Indique el módulo a mover');
+    err.status = 400;
+    throw err;
+  }
+
+  const res = await query(
+    `SELECT d.cnplan, d.item, d.nombre, d.orden, pr.modulo, pr.nombre AS proc_nombre,
+            m.orden AS modulo_orden, m.nombre AS modulo_nombre
+     FROM plantrabd d
+     LEFT JOIN qrysproc pr ON pr.codigo = d.proceso_codigo
+     LEFT JOIN qrysmod m ON m.codigo = pr.modulo
+     WHERE d.cnplan = $1`,
+    [cnplan],
+  );
+  if (!res.rows.length) {
+    const err = new Error('El plan no tiene actividades');
+    err.status = 404;
+    throw err;
+  }
+
+  const blockMap = buildPlanAreaBlocks(res.rows);
+  const byMod = new Map();
+  for (const block of blockMap.values()) {
+    if (!byMod.has(block.modulo)) byMod.set(block.modulo, []);
+    byMod.get(block.modulo).push(block);
+  }
+
+  const modulos = [...byMod.entries()]
+    .map(([mod, blocks]) => {
+      const sorted = blocks.sort((a, b) => {
+        const diff = (a.minOrden ?? 999) - (b.minOrden ?? 999);
+        if (diff !== 0) return diff;
+        return a.area.localeCompare(b.area, 'es');
+      });
+      return {
+        modulo: mod,
+        minOrden: sorted[0]?.minOrden ?? 999,
+        modulo_orden: sorted[0]?.modulo_orden ?? 999,
+        blocks: sorted,
+      };
+    })
+    .sort((a, b) => {
+      const diff = a.minOrden - b.minOrden;
+      if (diff !== 0) return diff;
+      const mo = a.modulo_orden - b.modulo_orden;
+      if (mo !== 0) return mo;
+      return String(a.modulo).localeCompare(String(b.modulo), 'es');
+    });
+
+  const idx = modulos.findIndex((m) => m.modulo === modKey);
+  if (idx < 0) {
+    const err = new Error(`Módulo «${modKey}» no encontrado en el plan`);
+    err.status = 404;
+    throw err;
+  }
+  const newIdx = idx + shift;
+  if (newIdx < 0 || newIdx >= modulos.length) {
+    const err = new Error('No se puede mover el módulo más en esa dirección');
+    err.status = 400;
+    throw err;
+  }
+
+  [modulos[idx], modulos[newIdx]] = [modulos[newIdx], modulos[idx]];
+
+  let orden = 1;
+  const updates = [];
+  for (const mod of modulos) {
+    for (const block of mod.blocks) {
+      for (const item of block.items) {
+        updates.push({ item: item.item, orden });
+        orden += 1;
+      }
     }
   }
 

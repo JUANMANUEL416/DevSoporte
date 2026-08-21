@@ -69,8 +69,8 @@ export function planTrabajoExcelFileName(enc) {
 
 function sortItems(items) {
   return [...items].sort((a, b) => {
-    const aa = planItemArea(a.nombre, a.proc_nombre).localeCompare(
-      planItemArea(b.nombre, b.proc_nombre),
+    const aa = planItemArea(a.nombre, a.proc_nombre, a.modulo_nombre).localeCompare(
+      planItemArea(b.nombre, b.proc_nombre, b.modulo_nombre),
       'es',
     );
     if (aa !== 0) return aa;

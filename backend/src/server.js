@@ -82,6 +82,7 @@ import {
   reorganizarAgrupadorHandler,
   reordenarHandler,
   moverAgrupadorHandler,
+  moverModuloHandler,
 } from './routes/planTrabajo.js';
 import destinatariosHandler from './routes/clienteNotificaciones.js';
 import clienteEquipoRoutes from './routes/clienteEquipo.js';
@@ -443,6 +444,7 @@ app.post('/api/plan_trabajo/:id/agregar-procesos', requireAuth, agregarProcesosH
 app.post('/api/plan_trabajo/:id/agregar-grupo', requireAuth, agregarGrupoHandler);
 app.post('/api/plan_trabajo/:id/reordenar', requireAuth, reordenarHandler);
 app.post('/api/plan_trabajo/:id/mover-agrupador', requireAuth, moverAgrupadorHandler);
+app.post('/api/plan_trabajo/:id/mover-modulo', requireAuth, moverModuloHandler);
 app.post('/api/plan_trabajo/:id/reorganizar-modulo', requireAuth, reorganizarModuloHandler);
 app.post('/api/plan_trabajo/:id/reorganizar-agrupador', requireAuth, reorganizarAgrupadorHandler);
 app.post('/api/plan_trabajo/:id/generar-cronograma', requireAuth, generarCronogramaHandler);

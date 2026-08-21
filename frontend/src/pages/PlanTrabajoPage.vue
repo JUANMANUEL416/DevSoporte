@@ -122,7 +122,7 @@
                   <template v-if="getItemRows(props.row.cnplan).length">
                   <template v-if="hasModuloLayout(props.row.cnplan)">
                     <section
-                      v-for="modBlock in getModuloGroups(props.row.cnplan)"
+                      v-for="(modBlock, modIdx) in getModuloGroups(props.row.cnplan)"
                       :key="`${props.row.cnplan}:mod:${modBlock.modulo}`"
                       class="modulo-group"
                     >
@@ -130,6 +130,25 @@
                         <q-icon name="view_module" size="18px" class="q-mr-sm" color="primary" />
                         <strong>{{ modBlock.modulo_nombre }}</strong>
                         <span class="modulo-group__count">{{ modBlock.areas.length }} agrupador(es)</span>
+                        <div
+                          v-if="isPlanEditable(props.row)"
+                          class="modulo-group__actions row no-wrap q-gutter-xs"
+                        >
+                          <q-btn
+                            flat dense round icon="arrow_upward" size="sm" color="primary"
+                            :disable="modIdx === 0"
+                            @click="moveModuloBlock(props.row.cnplan, modBlock.modulo, -1)"
+                          >
+                            <q-tooltip>Subir módulo</q-tooltip>
+                          </q-btn>
+                          <q-btn
+                            flat dense round icon="arrow_downward" size="sm" color="primary"
+                            :disable="modIdx === getModuloGroups(props.row.cnplan).length - 1"
+                            @click="moveModuloBlock(props.row.cnplan, modBlock.modulo, 1)"
+                          >
+                            <q-tooltip>Bajar módulo</q-tooltip>
+                          </q-btn>
+                        </div>
                       </header>
                       <section
                         v-for="(areaBlock, areaIdx) in modBlock.areas"
@@ -508,16 +527,19 @@ function getItemRows(cnplan) {
   return itemCache.value[cnplan]?.rows || [];
 }
 
-function planItemArea(nombre, procNombre) {
+function planItemArea(nombre, procNombre, moduloNombre = '') {
   const text = String(procNombre || nombre || '').trim();
   const idx = text.indexOf(' / ');
   if (idx > 0) return text.slice(0, idx).trim();
-  return '';
+  const mod = String(moduloNombre || '').trim();
+  const m = mod.match(/^\d+\.\s*(.+)$/);
+  if (m) return m[1].trim();
+  return mod || text;
 }
 
 function planItemActividad(row) {
   const text = String(row.proc_nombre || row.nombre || '').trim();
-  const area = planItemArea(row.nombre, row.proc_nombre);
+  const area = planItemArea(row.nombre, row.proc_nombre, row.modulo_nombre);
   if (area && text.startsWith(`${area} / `)) {
     return text.slice(area.length + 3).trim() || '—';
   }
@@ -543,7 +565,7 @@ function getModuloGroups(cnplan) {
       });
     }
     const mod = modMap.get(modKey);
-    const area = planItemArea(row.nombre, row.proc_nombre) || 'General';
+    const area = planItemArea(row.nombre, row.proc_nombre, row.modulo_nombre) || 'General';
     if (!mod.areasMap.has(area)) {
       modMap.get(modKey).areasMap.set(area, { area, minOrden: row.orden ?? 999, items: [] });
     }
@@ -552,11 +574,8 @@ function getModuloGroups(cnplan) {
     areaBlock.items.push(row);
   }
   return [...modMap.values()]
-    .sort((a, b) => (a.modulo_orden ?? 999) - (b.modulo_orden ?? 999))
-    .map((mod) => ({
-      modulo: mod.modulo,
-      modulo_nombre: mod.modulo_nombre,
-      areas: [...mod.areasMap.values()]
+    .map((mod) => {
+      const areas = [...mod.areasMap.values()]
         .sort((a, b) => {
           const diff = (a.minOrden ?? 999) - (b.minOrden ?? 999);
           if (diff !== 0) return diff;
@@ -565,8 +584,18 @@ function getModuloGroups(cnplan) {
         .map((b) => ({
           area: b.area,
           items: [...b.items].sort((a, c) => (Number(a.orden) || 0) - (Number(c.orden) || 0)),
-        })),
-    }));
+        }));
+      const minOrden = areas.length
+        ? Math.min(...areas.map((a) => a.items[0]?.orden ?? 999))
+        : 999;
+      return { ...mod, areas, minOrden };
+    })
+    .sort((a, b) => {
+      const diff = (a.minOrden ?? 999) - (b.minOrden ?? 999);
+      if (diff !== 0) return diff;
+      return (a.modulo_orden ?? 999) - (b.modulo_orden ?? 999);
+    })
+    .map(({ modulo, modulo_nombre, areas }) => ({ modulo, modulo_nombre, areas }));
 }
 
 function isItemLoading(cnplan) {
@@ -819,6 +848,15 @@ async function moveAreaBlock(cnplan, modulo, area, delta) {
   }
 }
 
+async function moveModuloBlock(cnplan, modulo, delta) {
+  try {
+    await planTrabajoApi.moverModulo(cnplan, { modulo, delta });
+    loadItems(cnplan, true);
+  } catch (err) {
+    $q.notify({ type: 'negative', message: extractApiError(err) });
+  }
+}
+
 async function moveItem(cnplan, row, delta) {
   const rows = [...getItemRows(cnplan)].sort((a, b) => (a.orden || 0) - (b.orden || 0));
   const idx = rows.findIndex((r) => r.item === row.item);
@@ -1047,6 +1085,9 @@ onMounted(() => {
   font-size: 0.72rem;
   color: #64748b;
   font-weight: 500;
+}
+.modulo-group__actions {
+  flex-shrink: 0;
 }
 .area-group {
   margin: 8px;
