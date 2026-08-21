@@ -162,7 +162,7 @@ function groupItemsByModuloAndArea(items) {
       });
     }
     const mod = modMap.get(modKey);
-    const area = planItemArea(item.nombre, item.proc_nombre) || 'General';
+    const area = planItemArea(item.nombre, item.proc_nombre, item.modulo_nombre) || 'General';
     if (!mod.areas.has(area)) {
       mod.areas.set(area, { area, minOrden: item.orden ?? 999, items: [] });
     }
@@ -172,17 +172,24 @@ function groupItemsByModuloAndArea(items) {
   }
 
   return [...modMap.values()]
-    .sort((a, b) => a.modulo_orden - b.modulo_orden)
-    .map((g) => ({
-      ...g,
-      areas: [...g.areas.values()]
+    .map((g) => {
+      const areas = [...g.areas.values()]
         .sort((a, b) => {
           const diff = (a.minOrden ?? 999) - (b.minOrden ?? 999);
           if (diff !== 0) return diff;
           return a.area.localeCompare(b.area, 'es');
         })
-        .map(({ area, items }) => ({ area, items })),
-    }));
+        .map(({ area, items }) => ({ area, items }));
+      const minOrden = areas.length
+        ? Math.min(...areas.map((a) => a.items[0]?.orden ?? 999))
+        : 999;
+      return { ...g, areas, minOrden };
+    })
+    .sort((a, b) => {
+      const diff = (a.minOrden ?? 999) - (b.minOrden ?? 999);
+      if (diff !== 0) return diff;
+      return a.modulo_orden - b.modulo_orden;
+    });
 }
 
 function drawTableHeader(doc, L, y, cols) {

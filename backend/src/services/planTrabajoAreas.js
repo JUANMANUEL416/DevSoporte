@@ -1,7 +1,16 @@
 import { query } from '../db/pool.js';
 
-/** Expresión SQL: área del ítem (ej. «Inventario» en «Inventario / Bodegas»). Prioriza el proceso. */
-export const PLAN_ITEM_AREA_SQL = `TRIM(SPLIT_PART(COALESCE(NULLIF(TRIM(pr.nombre), ''), NULLIF(TRIM(d.nombre), ''), ''), ' / ', 1))`;
+/**
+ * Expresión SQL: área del ítem (ej. «Inventario»).
+ * Si el proceso tiene prefijo «Inventario / …», usa ese prefijo; si no, el nombre del módulo Qrystalos (ej. «15. Inventario» → Inventario).
+ */
+export const PLAN_ITEM_AREA_SQL = `
+  CASE
+    WHEN POSITION(' / ' IN COALESCE(NULLIF(TRIM(pr.nombre), ''), NULLIF(TRIM(d.nombre), ''))) > 0
+    THEN TRIM(SPLIT_PART(COALESCE(NULLIF(TRIM(pr.nombre), ''), NULLIF(TRIM(d.nombre), '')), ' / ', 1))
+    ELSE TRIM(REGEXP_REPLACE(COALESCE(m.nombre, ''), '^[0-9]+\\.\\s*', ''))
+  END
+`;
 
 /** Primer agrupador Qrystalos del proceso (si pertenece a varios). */
 export const PLAN_ITEM_GRUPO_LATERAL = `
@@ -15,11 +24,19 @@ export const PLAN_ITEM_GRUPO_LATERAL = `
   ) grp ON true
 `;
 
-export function planItemArea(nombre, procNombre) {
+export function areaFromModuloNombre(moduloNombre) {
+  const s = String(moduloNombre || '').trim();
+  const m = s.match(/^\d+\.\s*(.+)$/);
+  return m ? m[1].trim() : s;
+}
+
+export function planItemArea(nombre, procNombre, moduloNombre = '') {
   const text = String(procNombre || nombre || '').trim();
   const idx = text.indexOf(' / ');
   if (idx > 0) return text.slice(0, idx).trim();
-  return '';
+  const fromMod = areaFromModuloNombre(moduloNombre);
+  if (fromMod) return fromMod;
+  return text;
 }
 
 export function planItemSubtitulo(nombre, procNombre, grupoNombre) {
@@ -34,15 +51,15 @@ export function planItemActividadLabel(item) {
   return subt || item?.nombre || item?.proc_nombre || '—';
 }
 
-/** Agrupador padre del plan (Inventario, Financiero…) — prefijo del proceso, no el qrysgrupo suelto. */
+/** Agrupador padre del plan (Inventario, Financiero…) — prefijo del proceso o módulo Qrystalos. */
 export function planItemAgrupadorPadre(item) {
-  return planItemArea(item?.nombre, item?.proc_nombre) || 'General';
+  return planItemArea(item?.nombre, item?.proc_nombre, item?.modulo_nombre) || 'General';
 }
 
 export function buildPlanItemNombre(row) {
-  const area = planItemArea(row.nombre, row.proc_nombre);
-  const subt = planItemSubtitulo(row.nombre, row.proc_nombre, '');
-  if (area && subt) return `${area} / ${subt}`;
+  const area = planItemArea(row.nombre, row.proc_nombre, row.modulo_nombre);
+  const subt = planItemSubtitulo(row.nombre, row.proc_nombre, row.grupo_nombre);
+  if (area && subt && subt !== area) return `${area} / ${subt}`;
   return row.proc_nombre || row.nombre || area || '—';
 }
 
@@ -56,6 +73,7 @@ export async function listPlanItemsModuloArea(cnplan, codigoModulo, area) {
             grp.grupo_codigo AS grupo, grp.grupo_nombre
      FROM plantrabd d
      JOIN qrysproc pr ON pr.codigo = d.proceso_codigo
+     JOIN qrysmod m ON m.codigo = pr.modulo
      ${PLAN_ITEM_GRUPO_LATERAL}
      WHERE d.cnplan = $1
        AND pr.modulo = $2
