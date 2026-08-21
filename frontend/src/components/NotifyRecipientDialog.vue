@@ -567,6 +567,7 @@ const isBitacoraMode = computed(() => props.notifyType === 'bitacora');
 const isSemanaReportMode = computed(() => props.notifyType === 'bitacora_semana');
 const isFirmasSemanaMode = computed(() => props.notifyType === 'bitacora_firmas_semana');
 const isActproyMode = computed(() => props.notifyType === 'actproy');
+const isPlanTrabajoMode = computed(() => props.notifyType === 'plan_trabajo');
 const isActreunMode = computed(() => props.notifyType === 'actreun');
 const isActreunFirmasMode = computed(() => props.notifyType === 'actreun_firmas');
 const isVipCuentaCobroMode = computed(() => props.notifyType === 'vip_cuenta_cobro');
@@ -577,6 +578,7 @@ const isSplitRecipientsMode = computed(() =>
   || isSemanaReportMode.value
   || isFirmasSemanaMode.value
   || isActproyMode.value
+  || isPlanTrabajoMode.value
   || isActreunMode.value
   || isActreunFirmasMode.value
   || isVipCuentaCobroMode.value,
@@ -659,6 +661,17 @@ const previewSample = computed(() => {
       .map((c) => c.email)
       .join(', ') || '(ninguno)';
     return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF informe firmado)`;
+  }
+  if (isPlanTrabajoMode.value) {
+    const para = allContactosTo.value
+      .filter((c) => selectedTo.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(sin destinatarios)';
+    const copia = [...contactosCc.value, ...manualContactosCc.value]
+      .filter((c) => selectedCc.value.includes(c.email))
+      .map((c) => c.email)
+      .join(', ') || '(ninguno)';
+    return `Para: ${para}\nCopia (CC): ${copia}\n\nAsunto: ${subject.value}\n\n${body}\n\n(Adjunto: PDF plan de trabajo Qrystalos)`;
   }
   if (isActreunMode.value) {
     const para = allContactosTo.value
@@ -897,6 +910,35 @@ watch(
         const [destData, previewData] = await Promise.all([
           clientesApi.destinatarios(props.clienteCodigo),
           actproyApi.previewInforme(props.recordId),
+        ]);
+        clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
+        defaultSubject.value = previewData.subject || '';
+        defaultBody.value = previewData.body || '';
+        subject.value = previewData.subject || '';
+        bodyText.value = previewData.body || '';
+        contactosTo.value = (destData.contactosConEmail || []).map((c, i) => ({
+          ...c,
+          id: `to-${i}-${c.email}`,
+        }));
+        contactosCc.value = (destData.equipoConEmail || []).map((c, i) => ({
+          ...c,
+          id: `cc-${i}-${c.email}`,
+        }));
+        selectedTo.value = contactosTo.value.map((c) => c.email);
+        selectedCc.value = contactosCc.value.map((c) => c.email);
+        if (!contactosTo.value.length) {
+          $q.notify({
+            type: 'warning',
+            message: 'El cliente no tiene contactos con correo. Agregue uno manualmente en Para.',
+          });
+        }
+        return;
+      }
+
+      if (isPlanTrabajoMode.value) {
+        const [destData, previewData] = await Promise.all([
+          clientesApi.destinatarios(props.clienteCodigo),
+          notificacionApi.previewPlanTrabajo(props.recordId),
         ]);
         clienteNombre.value = destData.nombrecliente || props.clienteCodigo;
         defaultSubject.value = previewData.subject || '';
