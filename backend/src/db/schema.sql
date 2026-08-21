@@ -447,7 +447,7 @@ CREATE TABLE IF NOT EXISTS rasist (
     registro_token TEXT,
     estado       VARCHAR(20) DEFAULT 'Abierta',
     cnscrono     VARCHAR(20),
-    tema_codigo  VARCHAR(20)
+    tema_codigo  VARCHAR(80)
 );
 CREATE INDEX IF NOT EXISTS rasist_cnscrono ON rasist (cnscrono);
 CREATE INDEX IF NOT EXISTS rasist_cnscrono_tema ON rasist (cnscrono, tema_codigo);
@@ -710,7 +710,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS cronocapd (
     cnscrono        VARCHAR(20) NOT NULL,
     item            SMALLINT NOT NULL,
-    tema_codigo     VARCHAR(20) NOT NULL,
+    tema_codigo     VARCHAR(80) NOT NULL,
     tema_nombre     VARCHAR(120) NOT NULL,
     descripcion     VARCHAR(500) NOT NULL,
     duracion        SMALLINT,
